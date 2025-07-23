@@ -1,0 +1,367 @@
+use alloy::{
+    network::EthereumWallet,
+    primitives::{Address, U256, Bytes, TxHash, FixedBytes},
+    providers::{Provider, ProviderBuilder},
+    rpc::types::{TransactionRequest, Filter},
+    signers::local::PrivateKeySigner,
+    consensus::Transaction,
+    network::TransactionResponse,
+};
+use anyhow::Result;
+use bip39::{Language, Mnemonic};
+use k256::ecdsa::SigningKey;
+use rand::thread_rng;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use hex;
+use crate::types::{Erc20TransferEvent, NativeTransactionEvent};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvmWallet {
+    pub private_key: String,
+    pub public_key: String,
+    pub address: String,
+    pub mnemonic: Option<String>,
+    #[serde(skip)]
+    pub signer: Option<PrivateKeySigner>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WalletResponse {
+    pub address: String,
+    pub private_key: String,
+    pub public_key: String,
+    pub mnemonic: Option<String>,
+}
+
+impl EvmWallet {
+    pub fn new_random() -> Result<Self> {
+        let signing_key = SigningKey::random(&mut thread_rng());
+        let private_key_bytes = signing_key.to_bytes();
+        let private_key = hex::encode(private_key_bytes);
+        
+        let signer = PrivateKeySigner::from_str(&private_key)?;
+        let address = signer.address();
+        
+        let public_key = hex::encode(signing_key.verifying_key().to_encoded_point(false).as_bytes());
+        
+        Ok(EvmWallet {
+            private_key,
+            public_key,
+            address: format!("{:#x}", address),
+            mnemonic: None,
+            signer: Some(signer),
+        })
+    }
+
+    pub fn address_from_private_key(private_key: &str) -> Result<String> {
+        let signer = PrivateKeySigner::from_str(private_key)?;
+        let address = signer.address();
+        Ok(format!("{:#x}", address))
+    }
+
+    pub fn create_wallet_from_private_key(private_key: &str) -> Result<Self> {
+        let signer = PrivateKeySigner::from_str(private_key)?;
+        let address = signer.address();
+        let private_key_bytes = hex::decode(private_key.trim_start_matches("0x"))?;
+        let signing_key = SigningKey::from_slice(&private_key_bytes)?;
+        let public_key = hex::encode(signing_key.verifying_key().to_encoded_point(false).as_bytes());
+        
+        Ok(EvmWallet {
+            private_key: private_key.to_string(),
+            public_key,
+            address: format!("{:#x}", address),
+            mnemonic: None,
+            signer: Some(signer),
+        })
+    }
+
+    pub fn generate_mnemonic() -> Result<String> {
+        Self::generate_mnemonic_with_words(24)
+    }
+
+    pub fn generate_mnemonic_with_words(word_count: usize) -> Result<String> {
+        let entropy_bits = match word_count {
+            12 => 128,
+            15 => 160,
+            18 => 192, 
+            21 => 224,
+            24 => 256,
+            _ => return Err(anyhow::anyhow!("Only support 12, 15, 18, 21, 24.")),
+        };
+        
+        let entropy_bytes = entropy_bits / 8;
+        let mut entropy = vec![0u8; entropy_bytes];
+        getrandom::getrandom(&mut entropy)?;
+        
+        let mnemonic = Mnemonic::from_entropy_in(Language::English, &entropy)?;
+        Ok(mnemonic.to_string())
+    }
+
+    pub fn from_mnemonic(mnemonic_phrase: &str) -> Result<Self> {
+        let mnemonic = Mnemonic::parse_in(Language::English, mnemonic_phrase)?;
+        let seed = mnemonic.to_seed("");
+        let signing_key = SigningKey::from_slice(&seed[0..32])?;
+        let private_key = hex::encode(signing_key.to_bytes());
+        let signer = PrivateKeySigner::from_str(&private_key)?;
+        let address = signer.address();
+        
+        let public_key = hex::encode(signing_key.verifying_key().to_encoded_point(false).as_bytes());
+        
+        Ok(EvmWallet {
+            private_key,
+            public_key,
+            address: format!("{:#x}", address),
+            mnemonic: Some(mnemonic_phrase.to_string()),
+            signer: Some(signer),
+        })
+    }
+
+    pub async fn send_native_coin(
+        &self,
+        to: &str,
+        amount_eth: U256,
+        rpc_url: &str,
+    ) -> Result<TxHash> {
+        let provider = ProviderBuilder::new()
+            .wallet(EthereumWallet::from(self.signer.clone().unwrap()))
+            .connect_http(rpc_url.parse()?);
+
+        let to_address = Address::from_str(to)?;
+        let amount_wei = amount_eth * U256::from(10u64.pow(18));
+
+        let tx = TransactionRequest::default()
+            .to(to_address)
+            .value(amount_wei);
+
+        let pending_tx = provider.send_transaction(tx).await?;
+        let tx_hash = *pending_tx.tx_hash();
+        let _receipt = pending_tx.get_receipt().await?;
+        Ok(tx_hash)
+    }
+
+    pub async fn send_erc20_token(
+        &self,
+        to: &str,
+        amount_token: U256,
+        token_address: &str,
+        rpc_url: &str,
+    ) -> Result<TxHash> {
+        let provider = ProviderBuilder::new()
+            .wallet(EthereumWallet::from(self.signer.clone().unwrap()))
+            .connect_http(rpc_url.parse()?);
+
+        let token_addr = Address::from_str(token_address)?;
+        let to_address = Address::from_str(to)?;
+        let amount = amount_token * U256::from(10u64.pow(18));
+
+        let function_selector = "a9059cbb";
+        let to_padded = format!("{:0>64}", format!("{:x}", to_address));
+        let amount_padded = format!("{:0>64x}", amount);
+        
+        let data = format!("{}{}{}", function_selector, to_padded, amount_padded);
+        let call_data = Bytes::from(hex::decode(data)?);
+
+        let tx = TransactionRequest::default()
+            .to(token_addr)
+            .input(call_data.into());
+
+        let pending_tx = provider.send_transaction(tx).await?;
+        let tx_hash = *pending_tx.tx_hash();
+        let _receipt = pending_tx.get_receipt().await?;
+        Ok(tx_hash)
+    }
+
+    pub async fn get_native_balance(address: &str, rpc_url: &str) -> Result<U256> {
+        let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
+        let addr = Address::from_str(address)?;
+        let balance = provider.get_balance(addr).await?;
+        Ok(balance)
+    }
+
+    pub async fn get_erc20_balance(
+        address: &str,
+        token_address: &str,
+        rpc_url: &str,
+    ) -> Result<U256> {
+        let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
+        
+        let token_addr = Address::from_str(token_address)?;
+        let user_addr = Address::from_str(address)?;
+
+        let function_selector = "70a08231";
+        let address_padded = format!("{:0>64}", format!("{:x}", user_addr));
+        let data = format!("{}{}", function_selector, address_padded);
+        let call_data = Bytes::from(hex::decode(data)?);
+
+        let call_request = TransactionRequest::default()
+            .to(token_addr)
+            .input(call_data.into());
+
+        let result = provider.call(call_request).await?;
+        let balance = U256::from_be_slice(&result);
+        Ok(balance)
+    }
+
+    pub async fn estimate_gas(
+        &self,
+        to: &str,
+        _amount_eth: U256,
+        rpc_url: &str,
+    ) -> Result<(u64, String, String)> {
+        let provider = ProviderBuilder::new()
+            .wallet(EthereumWallet::from(self.signer.clone().unwrap()))
+            .connect_http(rpc_url.parse()?);
+        let to_address = Address::from_str(to)?;
+        
+        let estimate_amount = U256::from(10u64.pow(16)); // 0.01 ETH in wei
+
+        let tx = TransactionRequest::default()
+            .to(to_address)
+            .value(estimate_amount);
+
+        let gas_limit = provider.estimate_gas(tx).await?;
+        let gas_price = provider.get_gas_price().await?;
+        let total_fee = U256::from(gas_limit) * U256::from(gas_price);
+        
+        Ok((gas_limit as u64, gas_price.to_string(), total_fee.to_string()))
+    }
+
+    pub async fn get_erc20_transfer_events(
+        token_address: &str,
+        from_block: Option<u64>,
+        to_block: Option<u64>,
+        address_filter: Option<&str>,
+        rpc_url: &str,
+    ) -> Result<Vec<Erc20TransferEvent>> {
+        let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
+        let token_addr = Address::from_str(token_address)?;
+    
+        let transfer_topic = FixedBytes::from_str("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")?;
+        
+        let mut filter = Filter::new()
+            .address(token_addr)
+            .event_signature(transfer_topic);
+            
+        if let Some(from) = from_block {
+            filter = filter.from_block(from);
+        }
+        
+        if let Some(to) = to_block {
+            filter = filter.to_block(to);
+        }
+        
+        if let Some(addr_filter) = address_filter {
+            let filter_addr = Address::from_str(addr_filter)?;
+            let padded_addr = FixedBytes::from_slice(&[&[0u8; 12], filter_addr.as_slice()].concat());
+            filter = filter.topic1(padded_addr);
+        }
+        
+        let logs = provider.get_logs(&filter).await?;
+        let mut events = Vec::new();
+        
+        for log in logs {
+            if log.topics().len() >= 3 {
+                let from_addr = Address::from_slice(&log.topics()[1].as_slice()[12..]);
+                let to_addr = Address::from_slice(&log.topics()[2].as_slice()[12..]);
+                let amount = U256::from_be_slice(&log.data().data);
+                
+                let event = Erc20TransferEvent {
+                    transaction_hash: format!("{:#x}", log.transaction_hash.unwrap_or_default()),
+                    block_number: log.block_number.unwrap_or_default(),
+                    from_address: format!("{:#x}", from_addr),
+                    to_address: format!("{:#x}", to_addr),
+                    amount: amount.to_string(),
+                    log_index: log.log_index.unwrap_or_default(),
+                };
+                
+                events.push(event);
+            }
+        }
+        
+        Ok(events)
+    }
+
+    pub async fn get_native_transactions_by_block_range(
+        address: &str,
+        from_block: Option<u64>,
+        to_block: Option<u64>,
+        rpc_url: &str,
+    ) -> Result<Vec<NativeTransactionEvent>> {
+        let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
+        let target_addr = Address::from_str(address)?;
+        
+        let latest_block = provider.get_block_number().await?;
+        let from_block = from_block.unwrap_or(latest_block.saturating_sub(100));
+        let to_block = to_block.unwrap_or(latest_block);
+        
+        let mut native_transactions = Vec::new();
+        
+
+        for block_num in from_block..=to_block {
+            if let Ok(Some(block)) = provider.get_block_by_number(block_num.into()).await {
+                let block_number = block.header.number;
+                let block_timestamp = block.header.timestamp;
+                
+                if let Some(transactions) = block.transactions.as_transactions() {
+                    let tx_vec: Vec<_> = transactions.iter().cloned().collect();
+                    for tx in tx_vec {
+                        if tx.value() > U256::ZERO {
+                            let from_addr = tx.from();
+                            let to_addr = tx.to().unwrap_or_default();
+                            
+                            if from_addr == target_addr || to_addr == target_addr {
+                                let event = NativeTransactionEvent {
+                                    transaction_hash: format!("{:#x}", tx.tx_hash()),
+                                    block_number,
+                                    from_address: format!("{:#x}", from_addr),
+                                    to_address: format!("{:#x}", to_addr),
+                                    amount: tx.value().to_string(),
+                                    gas_used: tx.gas_limit() as u64,
+                                    gas_price: alloy::consensus::Transaction::gas_price(&tx).unwrap_or_default().to_string(),
+                                    transaction_index: tx.transaction_index.unwrap_or_default(),
+                                    timestamp: Some(block_timestamp),
+                                };
+                                native_transactions.push(event);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(native_transactions)
+    }
+    
+    pub async fn get_native_transaction_details(
+        tx_hash: &str,
+        rpc_url: &str,
+    ) -> Result<Option<NativeTransactionEvent>> {
+        let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
+        let hash = TxHash::from_str(tx_hash)?;
+        
+        if let Ok(Some(tx)) = provider.get_transaction_by_hash(hash).await {
+            if let Ok(Some(receipt)) = provider.get_transaction_receipt(hash).await {
+                let block = provider.get_block_by_number(
+                    receipt.block_number.unwrap_or_default().into()
+                ).await?;
+                
+                let event = NativeTransactionEvent {
+                    transaction_hash: format!("{:#x}", tx.tx_hash()),
+                    block_number: receipt.block_number.unwrap_or_default(),
+                    from_address: format!("{:#x}", tx.from()),
+                    to_address: format!("{:#x}", tx.to().unwrap_or_default()),
+                    amount: tx.value().to_string(),
+                    gas_used: receipt.gas_used as u64,
+                    gas_price: alloy::consensus::Transaction::gas_price(&tx).unwrap_or_default().to_string(),
+                    transaction_index: receipt.transaction_index.unwrap_or_default(),
+                    timestamp: block.map(|b| b.header.timestamp),
+                };
+                
+                return Ok(Some(event));
+            }
+        }
+        
+        Ok(None)
+    }
+} 
