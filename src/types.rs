@@ -117,18 +117,32 @@ pub struct Erc20TransferEvent {
 
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct NativeTransactionEvent {
+pub struct TransactionReceipt {
     pub transaction_hash: String,
     pub block_number: u64,
     pub from_address: String,
     pub to_address: String,
     pub amount: String,
     pub gas_used: u64,
+    pub gas_limit: u64,
     pub gas_price: String,
+    pub effective_gas_price: String,
+    pub transaction_fee: String,
+    pub burnt_fees: String,
     pub transaction_index: u64,
     pub timestamp: Option<u64>,
+    pub status: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct TransactionHistoryResponse {
+    pub transactions: Vec<TransactionReceipt>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TransactionDetailsResponse {
+    pub transaction: TransactionReceipt,
+}
 
 
  

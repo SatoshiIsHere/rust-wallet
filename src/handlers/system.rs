@@ -22,14 +22,11 @@ pub async fn get_env_info() -> ResponseJson<EnvInfoResponse> {
 
 pub async fn get_transaction_details(
     Json(payload): Json<TransactionDetailsRequest>,
-) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<ErrorResponse>)> {
+) -> Result<ResponseJson<TransactionDetailsResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
     let rpc_url = get_default_rpc_url();
     match EvmWallet::get_native_transaction_details(&payload.tx_hash, &rpc_url).await {
         Ok(Some(transaction)) => {
-            let response = serde_json::json!({
-                "transaction": transaction
-            });
-            Ok(ResponseJson(response))
+            Ok(ResponseJson(TransactionDetailsResponse { transaction }))
         }
         Ok(None) => {
             Err((
@@ -49,7 +46,7 @@ pub async fn get_transaction_details(
 
 pub async fn get_native_transaction_history(
     Json(payload): Json<NativeTransactionHistoryRequest>,
-) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<ErrorResponse>)> {
+) -> Result<ResponseJson<TransactionHistoryResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
     let rpc_url = get_default_rpc_url();
     match EvmWallet::get_native_transactions_by_block_range(
         &payload.address,
@@ -58,10 +55,7 @@ pub async fn get_native_transaction_history(
         &rpc_url,
     ).await {
         Ok(transactions) => {
-            let response = serde_json::json!({
-                "transactions": transactions
-            });
-            Ok(ResponseJson(response))
+            Ok(ResponseJson(TransactionHistoryResponse { transactions }))
         }
         Err(e) => {
             warn!("Failed to get native transaction history: {}", e);

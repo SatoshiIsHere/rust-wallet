@@ -14,7 +14,7 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use hex;
-use crate::types::{Erc20TransferEvent, NativeTransactionEvent};
+use crate::types::{Erc20TransferEvent, TransactionReceipt};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvmWallet {
@@ -287,7 +287,7 @@ impl EvmWallet {
         from_block: Option<u64>,
         to_block: Option<u64>,
         rpc_url: &str,
-    ) -> Result<Vec<NativeTransactionEvent>> {
+    ) -> Result<Vec<TransactionReceipt>> {
         let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
         let target_addr = Address::from_str(address)?;
         
@@ -311,18 +311,51 @@ impl EvmWallet {
                             let to_addr = tx.to().unwrap_or_default();
                             
                             if from_addr == target_addr || to_addr == target_addr {
-                                let event = NativeTransactionEvent {
-                                    transaction_hash: format!("{:#x}", tx.tx_hash()),
-                                    block_number,
-                                    from_address: format!("{:#x}", from_addr),
-                                    to_address: format!("{:#x}", to_addr),
-                                    amount: tx.value().to_string(),
-                                    gas_used: tx.gas_limit() as u64,
-                                    gas_price: alloy::consensus::Transaction::gas_price(&tx).unwrap_or_default().to_string(),
-                                    transaction_index: tx.transaction_index.unwrap_or_default(),
-                                    timestamp: Some(block_timestamp),
-                                };
-                                native_transactions.push(event);
+                                let tx_hash = tx.tx_hash();
+                                
+                                if let Ok(Some(receipt)) = provider.get_transaction_receipt(tx_hash).await {
+                                    let status = if receipt.status() {
+                                        "success".to_string()
+                                    } else {
+                                        "failed".to_string()
+                                    };
+                                    let gas_used = receipt.gas_used as u64;
+                                    let effective_gas_price = receipt.effective_gas_price.to_string();
+                                    
+                                    let effective_gas_price_u128 = receipt.effective_gas_price;
+                                    let transaction_fee = effective_gas_price_u128 * gas_used as u128;
+                                    
+                                    let burnt_fees = if let Ok(Some(block)) = provider.get_block_by_number(block_number.into()).await {
+                                        if let Some(base_fee) = block.header.base_fee_per_gas {
+                                            let burnt = base_fee as u128 * gas_used as u128;
+                                            burnt.to_string()
+                                        } else {
+                                            "0".to_string()
+                                        }
+                                    } else {
+                                        "0".to_string()
+                                    };
+                                    
+                                    let receipt = TransactionReceipt {
+                                        transaction_hash: format!("{:#x}", tx_hash),
+                                        block_number,
+                                        from_address: format!("{:#x}", from_addr),
+                                        to_address: format!("{:#x}", to_addr),
+                                        amount: tx.value().to_string(),
+                                        gas_used,
+                                        gas_limit: tx.gas_limit() as u64,
+                                        gas_price: effective_gas_price.clone(),
+                                        effective_gas_price,
+                                        transaction_fee: transaction_fee.to_string(),
+                                        burnt_fees,
+                                        transaction_index: tx.transaction_index.unwrap_or_default(),
+                                        timestamp: Some(block_timestamp),
+                                        status,
+                                    };
+                                    native_transactions.push(receipt);
+                                    continue;
+                                }
+
                             }
                         }
                     }
@@ -336,7 +369,7 @@ impl EvmWallet {
     pub async fn get_native_transaction_details(
         tx_hash: &str,
         rpc_url: &str,
-    ) -> Result<Option<NativeTransactionEvent>> {
+    ) -> Result<Option<TransactionReceipt>> {
         let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
         let hash = TxHash::from_str(tx_hash)?;
         
@@ -346,19 +379,45 @@ impl EvmWallet {
                     receipt.block_number.unwrap_or_default().into()
                 ).await?;
                 
-                let event = NativeTransactionEvent {
+                let status = if receipt.status() {
+                    "success".to_string()
+                } else {
+                    "failed".to_string()
+                };
+                
+                let effective_gas_price = receipt.effective_gas_price.to_string();
+                let gas_used = receipt.gas_used as u64;
+                let transaction_fee = receipt.effective_gas_price * gas_used as u128;
+                
+                let burnt_fees = if let Ok(Some(block)) = provider.get_block_by_number(receipt.block_number.unwrap_or_default().into()).await {
+                    if let Some(base_fee) = block.header.base_fee_per_gas {
+                        let burnt = base_fee as u128 * gas_used as u128;
+                        burnt.to_string()
+                    } else {
+                        "0".to_string()
+                    }
+                } else {
+                    "0".to_string()
+                };
+                
+                let receipt_data = TransactionReceipt {
                     transaction_hash: format!("{:#x}", tx.tx_hash()),
                     block_number: receipt.block_number.unwrap_or_default(),
                     from_address: format!("{:#x}", tx.from()),
                     to_address: format!("{:#x}", tx.to().unwrap_or_default()),
                     amount: tx.value().to_string(),
-                    gas_used: receipt.gas_used as u64,
-                    gas_price: alloy::consensus::Transaction::gas_price(&tx).unwrap_or_default().to_string(),
+                    gas_used,
+                    gas_limit: tx.gas_limit() as u64,
+                    gas_price: effective_gas_price.clone(),
+                    effective_gas_price,
+                    transaction_fee: transaction_fee.to_string(),
+                    burnt_fees,
                     transaction_index: receipt.transaction_index.unwrap_or_default(),
                     timestamp: block.map(|b| b.header.timestamp),
+                    status,
                 };
                 
-                return Ok(Some(event));
+                return Ok(Some(receipt_data));
             }
         }
         
