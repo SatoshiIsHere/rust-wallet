@@ -297,4 +297,58 @@ Content-Type: application/json
     }
   ]
 }
+```
+
+## 14. Get All Native Transaction History
+
+**핸들러**: `get_all_native_transaction_history`  
+**호출 설명**: 전체 네이티브 거래 내역 조회 (from_block은 필수, to_block은 선택사항 - 값이 없으면 현재 최신 블록으로 설정)
+**호출 예시**:
+```bash
+POST /transaction/history/all
+Content-Type: application/json
+
+{
+  "from_block": 12345600,
+  "to_block": 12345700
+}
+```
+**응답 예시**:
+```json
+{
+  "transactions": [
+    {
+      "transaction_hash": "0xabc123def456789abc123def456789abc123def456789abc123def456789abc123",
+      "block_number": 12345678,
+      "from_address": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa",
+      "to_address": "0x8ba1f109551bD432803012645Hac136c61c45aa",
+      "amount": "1000000000000000000",
+      "gas_used": 21000,
+      "gas_price": "1200000000",
+      "effective_gas_price": "1200000000",
+      "transaction_fee": "252000000000000",
+      "burnt_fees": "0",
+      "gas_limit": 21000,
+      "transaction_index": 5,
+      "timestamp": 1703123456,
+      "status": "success"
+    }
+  ]
+}
+```
+
+## 15. Get Current Block
+
+**핸들러**: `get_current_block`  
+**호출 설명**: 현재 최신 블록 번호 조회
+**호출 예시**:
+```bash
+GET /block/current
+```
+**응답 예시**:
+```json
+{
+  "current_block": 12345678
+}
+```
 ``` 

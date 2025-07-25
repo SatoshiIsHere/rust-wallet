@@ -30,6 +30,12 @@ pub struct NativeTransactionHistoryRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct AllTransactionHistoryRequest {
+    pub from_block: u64,
+    pub to_block: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct TransactionDetailsRequest {
     pub tx_hash: String,
 }
@@ -142,6 +148,11 @@ pub struct TransactionHistoryResponse {
 #[derive(Debug, Serialize)]
 pub struct TransactionDetailsResponse {
     pub transaction: TransactionReceipt,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CurrentBlockResponse {
+    pub current_block: u64,
 }
 
 

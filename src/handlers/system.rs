@@ -92,4 +92,42 @@ pub async fn get_erc20_events(
             ))
         }
     }
+}
+
+pub async fn get_all_native_transaction_history(
+    Json(payload): Json<AllTransactionHistoryRequest>,
+) -> Result<ResponseJson<TransactionHistoryResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    let rpc_url = get_default_rpc_url();
+    match EvmWallet::get_all_native_transactions_by_block_range(
+        payload.from_block,
+        payload.to_block,
+        &rpc_url,
+    ).await {
+        Ok(transactions) => {
+            Ok(ResponseJson(TransactionHistoryResponse { transactions }))
+        }
+        Err(e) => {
+            warn!("Failed to get all native transaction history: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                ResponseJson(ErrorResponse { error: e.to_string() }),
+            ))
+        }
+    }
+}
+
+pub async fn get_current_block() -> Result<ResponseJson<CurrentBlockResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    let rpc_url = get_default_rpc_url();
+    match EvmWallet::get_current_block(&rpc_url).await {
+        Ok(current_block) => {
+            Ok(ResponseJson(CurrentBlockResponse { current_block }))
+        }
+        Err(e) => {
+            warn!("Failed to get current block: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                ResponseJson(ErrorResponse { error: e.to_string() }),
+            ))
+        }
+    }
 } 

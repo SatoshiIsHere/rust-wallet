@@ -20,11 +20,13 @@ pub fn create_router() -> Router {
         .route("/transaction/estimateGas", post(handlers::estimate_gas))
         .route("/transaction/details", post(handlers::get_transaction_details))
         .route("/transaction/history", post(handlers::get_native_transaction_history))
+        .route("/transaction/history/all", post(handlers::get_all_native_transaction_history))
 
         .route("/balance/native", post(handlers::get_native_balance))
         .route("/balance/erc20", post(handlers::get_erc20_balance))
         
         .route("/events/erc20Transfers", post(handlers::get_erc20_events))
+        .route("/block/current", get(handlers::get_current_block))
         
         .layer(
             ServiceBuilder::new()

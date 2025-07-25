@@ -14,6 +14,7 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use hex;
+use tracing::{debug};
 use crate::types::{Erc20TransferEvent, TransactionReceipt};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -366,6 +367,111 @@ impl EvmWallet {
         Ok(native_transactions)
     }
     
+    pub async fn get_all_native_transactions_by_block_range(
+        from_block: u64,
+        to_block: Option<u64>,
+        rpc_url: &str,
+    ) -> Result<Vec<TransactionReceipt>> {
+        let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
+        
+        let latest_block = provider.get_block_number().await?;
+        let to_block = to_block.unwrap_or(latest_block);
+        
+        debug!("Searching from block {} to block {}", from_block, to_block);
+        
+        let mut all_transactions = Vec::new();
+        
+        for block_num in from_block..=to_block {
+            if let Ok(Some(block)) = provider.get_block_by_number(block_num.into()).await {
+                let block_number = block.header.number;
+                let block_timestamp = block.header.timestamp;
+                
+                debug!("Processing block {} with {} transactions", block_number, block.transactions.len());
+                
+                // Try different ways to extract transactions
+                let transactions = if let Some(txs) = block.transactions.as_transactions() {
+                    debug!("Using as_transactions() - found {} transactions", txs.len());
+                    Some(txs.iter().cloned().collect())
+                } else if let Some(tx_hashes) = block.transactions.as_hashes() {
+                    debug!("Using as_hashes() - found {} transaction hashes", tx_hashes.len());
+                    // For hash-only transactions, we need to fetch them individually
+                    let mut txs = Vec::new();
+                    for hash in tx_hashes {
+                        if let Ok(Some(tx)) = provider.get_transaction_by_hash(*hash).await {
+                            txs.push(tx);
+                        }
+                    }
+                    Some(txs)
+                } else {
+                    debug!("No transactions found in block {}", block_number);
+                    None
+                };
+                
+                if let Some(tx_vec) = transactions {
+                    debug!("Found {} native transactions in block {}", tx_vec.len(), block_number);
+                    
+                    for tx in tx_vec {
+                        debug!("Transaction value: {}", tx.value());
+                        // 모든 네이티브 거래를 포함 (value > 0 조건 제거)
+                        let tx_hash = tx.tx_hash();
+                        debug!("Processing transaction hash: {:#x}", tx_hash);
+                        
+                        if let Ok(Some(receipt)) = provider.get_transaction_receipt(tx_hash).await {
+                            debug!("Found receipt for transaction {:#x}", tx_hash);
+                            let status = if receipt.status() {
+                                "success".to_string()
+                            } else {
+                                "failed".to_string()
+                            };
+                            let gas_used = receipt.gas_used as u64;
+                            let effective_gas_price = receipt.effective_gas_price.to_string();
+                            
+                            let effective_gas_price_u128 = receipt.effective_gas_price;
+                            let transaction_fee = effective_gas_price_u128 * gas_used as u128;
+                            
+                            let burnt_fees = if let Ok(Some(block)) = provider.get_block_by_number(block_number.into()).await {
+                                if let Some(base_fee) = block.header.base_fee_per_gas {
+                                    let burnt = base_fee as u128 * gas_used as u128;
+                                    burnt.to_string()
+                                } else {
+                                    "0".to_string()
+                                }
+                            } else {
+                                "0".to_string()
+                            };
+                            
+                            let receipt_data = TransactionReceipt {
+                                transaction_hash: format!("{:#x}", tx_hash),
+                                block_number,
+                                from_address: format!("{:#x}", tx.from()),
+                                to_address: format!("{:#x}", tx.to().unwrap_or_default()),
+                                amount: tx.value().to_string(),
+                                gas_used,
+                                gas_limit: tx.gas_limit() as u64,
+                                gas_price: effective_gas_price.clone(),
+                                effective_gas_price,
+                                transaction_fee: transaction_fee.to_string(),
+                                burnt_fees,
+                                transaction_index: tx.transaction_index.unwrap_or_default(),
+                                timestamp: Some(block_timestamp),
+                                status,
+                            };
+                            all_transactions.push(receipt_data);
+                            debug!("Added transaction {} to results", format!("{:#x}", tx_hash));
+                        } else {
+                            debug!("No receipt found for transaction {:#x}", tx_hash);
+                        }
+                    }
+                } else {
+                    debug!("No native transactions found in block {}", block_number);
+                }
+            }
+        }
+        
+        debug!("Found {} total transactions", all_transactions.len());
+        Ok(all_transactions)
+    }
+    
     pub async fn get_native_transaction_details(
         tx_hash: &str,
         rpc_url: &str,
@@ -422,5 +528,11 @@ impl EvmWallet {
         }
         
         Ok(None)
+    }
+    
+    pub async fn get_current_block(rpc_url: &str) -> Result<u64> {
+        let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
+        let latest_block = provider.get_block_number().await?;
+        Ok(latest_block)
     }
 } 
