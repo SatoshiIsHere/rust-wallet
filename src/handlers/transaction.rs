@@ -22,7 +22,7 @@ pub async fn send_native_coin(
                 )
             })?;
 
-            let rpc_url = get_default_rpc_url();
+            let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
             match wallet.send_native_coin(&payload.to, amount, &rpc_url).await {
                 Ok(hash) => Ok(ResponseJson(TransactionResponse {
                     hash: format!("{:#x}", hash),
@@ -59,7 +59,7 @@ pub async fn send_erc20_token(
                 )
             })?;
 
-            let rpc_url = get_default_rpc_url();
+            let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
             match wallet.send_erc20_token(&payload.to, amount, &payload.token_address, &rpc_url).await {
                 Ok(hash) => Ok(ResponseJson(TransactionResponse {
                     hash: format!("{:#x}", hash),
@@ -98,7 +98,7 @@ pub async fn estimate_gas(
                 )
             })?;
 
-            let rpc_url = get_default_rpc_url();
+            let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
             match wallet.estimate_gas(&payload.to, amount, &rpc_url).await {
                 Ok((gas_limit, gas_price, total_fee)) => Ok(ResponseJson(GasEstimateResponse { 
                     gas_limit, 

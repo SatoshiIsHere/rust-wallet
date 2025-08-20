@@ -20,6 +20,7 @@ pub struct EstimateGasRequest {
     pub to: String,
     pub amount: String,
     pub private_key: String,
+    pub network: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -27,17 +28,20 @@ pub struct NativeTransactionHistoryRequest {
     pub address: String,
     pub from_block: Option<u64>,
     pub to_block: Option<u64>,
+    pub network: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct AllTransactionHistoryRequest {
     pub from_block: u64,
     pub to_block: Option<u64>,
+    pub network: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TransactionDetailsRequest {
     pub tx_hash: String,
+    pub network: Option<String>,
 }
 
 
@@ -70,6 +74,7 @@ pub struct SendTransactionRequest {
     pub to: String,
     pub amount: String,
     pub private_key: String,
+    pub network: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -78,6 +83,7 @@ pub struct SendErc20Request {
     pub amount: String,
     pub token_address: String,
     pub private_key: String,
+    pub network: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -89,12 +95,14 @@ pub struct TransactionResponse {
 #[derive(Debug, Deserialize)]
 pub struct BalanceRequest {
     pub address: String,
+    pub network: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Erc20BalanceRequest {
     pub address: String,
     pub token_address: String,
+    pub network: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -108,6 +116,7 @@ pub struct Erc20EventsRequest {
     pub from_block: Option<u64>,
     pub to_block: Option<u64>,
     pub address_filter: Option<String>,
+    pub network: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -153,6 +162,28 @@ pub struct TransactionDetailsResponse {
 #[derive(Debug, Serialize)]
 pub struct CurrentBlockResponse {
     pub current_block: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AddNetworkRequest {
+    pub name: String,
+    pub rpc_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RemoveNetworkRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NetworkInfo {
+    pub name: String,
+    pub rpc_url: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NetworksResponse {
+    pub networks: Vec<NetworkInfo>,
 }
 
 

@@ -11,7 +11,7 @@ use crate::utils::*;
 pub async fn get_native_balance(
     Json(payload): Json<BalanceRequest>,
 ) -> Result<ResponseJson<BalanceResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
     match EvmWallet::get_native_balance(&payload.address, &rpc_url).await {
         Ok(balance) => Ok(ResponseJson(BalanceResponse {
             balance: wei_to_eth(balance),
@@ -29,7 +29,7 @@ pub async fn get_native_balance(
 pub async fn get_erc20_balance(
     Json(payload): Json<Erc20BalanceRequest>,
 ) -> Result<ResponseJson<BalanceResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
     match EvmWallet::get_erc20_balance(&payload.address, &payload.token_address, &rpc_url).await {
         Ok(balance) => Ok(ResponseJson(BalanceResponse {
             balance: wei_to_eth(balance),

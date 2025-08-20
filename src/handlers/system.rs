@@ -23,7 +23,7 @@ pub async fn get_env_info() -> ResponseJson<EnvInfoResponse> {
 pub async fn get_transaction_details(
     Json(payload): Json<TransactionDetailsRequest>,
 ) -> Result<ResponseJson<TransactionDetailsResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
     match EvmWallet::get_native_transaction_details(&payload.tx_hash, &rpc_url).await {
         Ok(Some(transaction)) => {
             Ok(ResponseJson(TransactionDetailsResponse { transaction }))
@@ -47,7 +47,7 @@ pub async fn get_transaction_details(
 pub async fn get_native_transaction_history(
     Json(payload): Json<NativeTransactionHistoryRequest>,
 ) -> Result<ResponseJson<TransactionHistoryResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
     match EvmWallet::get_native_transactions_by_block_range(
         &payload.address,
         payload.from_block,
@@ -70,7 +70,7 @@ pub async fn get_native_transaction_history(
 pub async fn get_erc20_events(
     Json(payload): Json<Erc20EventsRequest>,
 ) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<ErrorResponse>)> {
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
     match EvmWallet::get_erc20_transfer_events(
         &payload.token_address,
         payload.from_block,
@@ -97,7 +97,7 @@ pub async fn get_erc20_events(
 pub async fn get_all_native_transaction_history(
     Json(payload): Json<AllTransactionHistoryRequest>,
 ) -> Result<ResponseJson<TransactionHistoryResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
     match EvmWallet::get_all_native_transactions_by_block_range(
         payload.from_block,
         payload.to_block,
@@ -127,6 +127,51 @@ pub async fn get_current_block() -> Result<ResponseJson<CurrentBlockResponse>, (
             Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 ResponseJson(ErrorResponse { error: e.to_string() }),
+            ))
+        }
+    }
+}
+
+pub async fn get_networks() -> ResponseJson<NetworksResponse> {
+    let networks = get_all_networks();
+    ResponseJson(NetworksResponse { networks })
+}
+
+pub async fn add_network(
+    Json(payload): Json<AddNetworkRequest>,
+) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    match add_custom_network(payload.name.clone(), payload.rpc_url) {
+        Ok(()) => {
+            let response = serde_json::json!({
+                "message": format!("Network '{}' added successfully", payload.name)
+            });
+            Ok(ResponseJson(response))
+        }
+        Err(e) => {
+            warn!("Failed to add network: {}", e);
+            Err((
+                StatusCode::BAD_REQUEST,
+                ResponseJson(ErrorResponse { error: e }),
+            ))
+        }
+    }
+}
+
+pub async fn remove_network(
+    Json(payload): Json<RemoveNetworkRequest>,
+) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    match remove_custom_network(&payload.name) {
+        Ok(()) => {
+            let response = serde_json::json!({
+                "message": format!("Network '{}' removed successfully", payload.name)
+            });
+            Ok(ResponseJson(response))
+        }
+        Err(e) => {
+            warn!("Failed to remove network: {}", e);
+            Err((
+                StatusCode::BAD_REQUEST,
+                ResponseJson(ErrorResponse { error: e }),
             ))
         }
     }

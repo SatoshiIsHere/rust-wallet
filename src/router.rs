@@ -28,6 +28,10 @@ pub fn create_router() -> Router {
         .route("/events/erc20Transfers", post(handlers::get_erc20_events))
         .route("/block/current", get(handlers::get_current_block))
         
+        .route("/networks", get(handlers::get_networks))
+        .route("/networks/add", post(handlers::add_network))
+        .route("/networks/remove", post(handlers::remove_network))
+        
         .layer(
             ServiceBuilder::new()
                 .layer(CorsLayer::permissive())
