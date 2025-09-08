@@ -110,7 +110,7 @@ curl -X POST http://localhost:3000/transaction/sendNative \
   -H "Content-Type: application/json" \
   -d '{
     "to": "0x742d35Cc6634C0532925a3b8D4C0C8C0d1c0b5e1",
-    "amount": "1000000000000000000",
+    "amount": 1.0,
     "private_key": "your_private_key_here",
     "network": "ethereum"
   }'
@@ -122,7 +122,7 @@ curl -X POST http://localhost:3000/transaction/sendErc20 \
   -H "Content-Type: application/json" \
   -d '{
     "to": "0x742d35Cc6634C0532925a3b8D4C0C8C0d1c0b5e1",
-    "amount": "1000000000000000000",
+    "amount": 1.0,
     "token_address": "0x55d398326f99059fF775485246999027B3197955",
     "private_key": "your_private_key_here",
     "network": "bsc"

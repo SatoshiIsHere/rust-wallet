@@ -3,3 +3,5 @@
 mise.toml
 
 .env
+
+.tool-versions
