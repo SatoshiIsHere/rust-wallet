@@ -18,7 +18,7 @@ pub struct GenerateMnemonicRequest {
 #[derive(Debug, Deserialize)]
 pub struct EstimateGasRequest {
     pub to: String,
-    pub amount: String,
+    pub amount: f64,
     pub private_key: String,
     pub network: Option<String>,
 }
@@ -72,7 +72,7 @@ pub struct EnvInfoResponse {
 #[derive(Debug, Deserialize)]
 pub struct SendTransactionRequest {
     pub to: String,
-    pub amount: String,
+    pub amount: f64,
     pub private_key: String,
     pub network: Option<String>,
 }
@@ -80,7 +80,7 @@ pub struct SendTransactionRequest {
 #[derive(Debug, Deserialize)]
 pub struct SendErc20Request {
     pub to: String,
-    pub amount: String,
+    pub amount: f64,
     pub token_address: String,
     pub private_key: String,
     pub network: Option<String>,

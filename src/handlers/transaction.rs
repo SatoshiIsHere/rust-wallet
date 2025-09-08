@@ -3,7 +3,6 @@ use axum::{
     http::StatusCode,
     response::Json as ResponseJson,
 };
-use std::str::FromStr;
 use tracing::warn;
 use alloy::primitives::U256;
 use crate::wallet::*;
@@ -15,12 +14,8 @@ pub async fn send_native_coin(
 ) -> Result<ResponseJson<TransactionResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
     match EvmWallet::create_wallet_from_private_key(&payload.private_key) {
         Ok(wallet) => {
-            let amount = U256::from_str(&payload.amount).map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    ResponseJson(ErrorResponse { error: format!("Invalid amount: {}", e) }),
-                )
-            })?;
+            let wei_amount = (payload.amount * 1_000_000_000_000_000_000.0) as u128;
+            let amount = U256::from(wei_amount);
 
             let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
             match wallet.send_native_coin(&payload.to, amount, &rpc_url).await {
@@ -52,12 +47,8 @@ pub async fn send_erc20_token(
 ) -> Result<ResponseJson<TransactionResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
     match EvmWallet::create_wallet_from_private_key(&payload.private_key) {
         Ok(wallet) => {
-            let amount = U256::from_str(&payload.amount).map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    ResponseJson(ErrorResponse { error: format!("Invalid amount: {}", e) }),
-                )
-            })?;
+            let wei_amount = (payload.amount * 1_000_000_000_000_000_000.0) as u128;
+            let amount = U256::from(wei_amount);
 
             let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
             match wallet.send_erc20_token(&payload.to, amount, &payload.token_address, &rpc_url).await {
@@ -91,12 +82,8 @@ pub async fn estimate_gas(
 ) -> Result<ResponseJson<GasEstimateResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
     match EvmWallet::create_wallet_from_private_key(&payload.private_key) {
         Ok(wallet) => {
-            let amount = U256::from_str(&payload.amount).map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    ResponseJson(ErrorResponse { error: format!("Invalid amount: {}", e) }),
-                )
-            })?;
+            let wei_amount = (payload.amount * 1_000_000_000_000_000_000.0) as u128;
+            let amount = U256::from(wei_amount);
 
             let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
             match wallet.estimate_gas(&payload.to, amount, &rpc_url).await {

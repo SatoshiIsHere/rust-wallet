@@ -121,7 +121,7 @@ impl EvmWallet {
     pub async fn send_native_coin(
         &self,
         to: &str,
-        amount_eth: U256,
+        amount_wei: U256,
         rpc_url: &str,
     ) -> Result<TxHash> {
         let provider = ProviderBuilder::new()
@@ -129,11 +129,11 @@ impl EvmWallet {
             .connect_http(rpc_url.parse()?);
 
         let to_address = Address::from_str(to)?;
-        let amount_wei = amount_eth * U256::from(10u64.pow(18));
 
         let tx = TransactionRequest::default()
             .to(to_address)
-            .value(amount_wei);
+            .value(amount_wei)
+            .gas_price(1_200_000_000u128);
 
         let pending_tx = provider.send_transaction(tx).await?;
         let tx_hash = *pending_tx.tx_hash();
@@ -144,7 +144,7 @@ impl EvmWallet {
     pub async fn send_erc20_token(
         &self,
         to: &str,
-        amount_token: U256,
+        amount_token_wei: U256,
         token_address: &str,
         rpc_url: &str,
     ) -> Result<TxHash> {
@@ -154,18 +154,18 @@ impl EvmWallet {
 
         let token_addr = Address::from_str(token_address)?;
         let to_address = Address::from_str(to)?;
-        let amount = amount_token * U256::from(10u64.pow(18));
 
         let function_selector = "a9059cbb";
         let to_padded = format!("{:0>64}", format!("{:x}", to_address));
-        let amount_padded = format!("{:0>64x}", amount);
+        let amount_padded = format!("{:0>64x}", amount_token_wei);
         
         let data = format!("{}{}{}", function_selector, to_padded, amount_padded);
         let call_data = Bytes::from(hex::decode(data)?);
 
         let tx = TransactionRequest::default()
             .to(token_addr)
-            .input(call_data.into());
+            .input(call_data.into())
+            .gas_price(1_200_000_000u128);
 
         let pending_tx = provider.send_transaction(tx).await?;
         let tx_hash = *pending_tx.tx_hash();
@@ -215,15 +215,15 @@ impl EvmWallet {
             .connect_http(rpc_url.parse()?);
         let to_address = Address::from_str(to)?;
         
-        let estimate_amount = U256::from(10u64.pow(16)); // 0.01 ETH in wei
+        let estimate_amount = U256::from(10u64.pow(16));
 
         let tx = TransactionRequest::default()
             .to(to_address)
             .value(estimate_amount);
 
         let gas_limit = provider.estimate_gas(tx).await?;
-        let gas_price = provider.get_gas_price().await?;
-        let total_fee = U256::from(gas_limit) * U256::from(gas_price);
+        let gas_price = U256::from(1_200_000_000u64);
+        let total_fee = U256::from(gas_limit) * gas_price;
         
         Ok((gas_limit as u64, gas_price.to_string(), total_fee.to_string()))
     }
@@ -388,13 +388,11 @@ impl EvmWallet {
                 
                 debug!("Processing block {} with {} transactions", block_number, block.transactions.len());
                 
-                // Try different ways to extract transactions
                 let transactions = if let Some(txs) = block.transactions.as_transactions() {
                     debug!("Using as_transactions() - found {} transactions", txs.len());
                     Some(txs.iter().cloned().collect())
                 } else if let Some(tx_hashes) = block.transactions.as_hashes() {
                     debug!("Using as_hashes() - found {} transaction hashes", tx_hashes.len());
-                    // For hash-only transactions, we need to fetch them individually
                     let mut txs = Vec::new();
                     for hash in tx_hashes {
                         if let Ok(Some(tx)) = provider.get_transaction_by_hash(*hash).await {
@@ -412,7 +410,6 @@ impl EvmWallet {
                     
                     for tx in tx_vec {
                         debug!("Transaction value: {}", tx.value());
-                        // 모든 네이티브 거래를 포함 (value > 0 조건 제거)
                         let tx_hash = tx.tx_hash();
                         debug!("Processing transaction hash: {:#x}", tx_hash);
                         
