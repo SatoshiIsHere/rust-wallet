@@ -9,7 +9,7 @@ pub fn get_env_var(key: &str) -> Option<String> {
 }
 
 pub fn get_default_rpc_url() -> String {
-    get_env_var("RPC_ENDPOINT").unwrap_or_else(|| "https://rpc.verylabs.io".to_string())
+    get_env_var("RPC_ENDPOINT").unwrap_or_else(|| "http://localhost:8545".to_string())
 }
 
 pub fn get_rpc_url_for_network(network: Option<&str>) -> String {

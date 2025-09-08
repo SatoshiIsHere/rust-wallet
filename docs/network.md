@@ -1,4 +1,6 @@
-### 네트워크 없이 사용 (기본값)
+# Network Management Guide
+
+## Using without Network (Default)
 ```bash
 curl -X POST http://localhost:3000/balance/native \
   -H "Content-Type: application/json" \
@@ -7,7 +9,7 @@ curl -X POST http://localhost:3000/balance/native \
   }'
 ```
 
-### 특정 네트워크 지정해서 사용
+## Using with Specific Network
 ```bash
 curl -X POST http://localhost:3000/balance/native \
   -H "Content-Type: application/json" \
@@ -17,11 +19,11 @@ curl -X POST http://localhost:3000/balance/native \
   }'
 ```
 
-## 네트워크 관리
+## Network Management
 
-### 1. 네트워크 추가하기
+### 1. Adding Networks
 
-새로운 네트워크를 추가할 수 있습니다. 이더리움 메인넷을 추가하는 예시:
+You can add new networks. Here's an example of adding Ethereum mainnet:
 
 ```bash
 curl -X POST http://localhost:3000/networks/add \
@@ -32,7 +34,7 @@ curl -X POST http://localhost:3000/networks/add \
   }'
 ```
 
-BSC 네트워크 추가:
+Adding BSC network:
 ```bash
 curl -X POST http://localhost:3000/networks/add \
   -H "Content-Type: application/json" \
@@ -42,15 +44,15 @@ curl -X POST http://localhost:3000/networks/add \
   }'
 ```
 
-### 2. 등록된 네트워크 목록 보기
+### 2. Viewing Registered Networks
 
-현재 등록된 모든 네트워크를 확인할 수 있습니다:
+You can check all currently registered networks:
 
 ```bash
 curl http://localhost:3000/networks
 ```
 
-응답 예시:
+Response example:
 ```json
 {
   "networks": [
@@ -66,9 +68,9 @@ curl http://localhost:3000/networks
 }
 ```
 
-### 3. 네트워크 삭제하기
+### 3. Removing Networks
 
-더 이상 사용하지 않는 네트워크를 삭제할 수 있습니다:
+You can delete networks that are no longer needed:
 
 ```bash
 curl -X POST http://localhost:3000/networks/remove \
@@ -78,11 +80,11 @@ curl -X POST http://localhost:3000/networks/remove \
   }'
 ```
 
-## 네트워크별 API 사용 예시
+## Network-Specific API Usage Examples
 
-### 잔액 조회
+### Balance Queries
 
-**이더리움에서 ETH 잔액 확인:**
+**Check ETH balance on Ethereum:**
 ```bash
 curl -X POST http://localhost:3000/balance/native \
   -H "Content-Type: application/json" \
@@ -92,7 +94,7 @@ curl -X POST http://localhost:3000/balance/native \
   }'
 ```
 
-**BSC에서 BNB 잔액 확인:**
+**Check BNB balance on BSC:**
 ```bash
 curl -X POST http://localhost:3000/balance/native \
   -H "Content-Type: application/json" \
@@ -102,9 +104,9 @@ curl -X POST http://localhost:3000/balance/native \
   }'
 ```
 
-### 토큰 전송
+### Token Transfers
 
-**이더리움에서 ETH 전송:**
+**Send ETH on Ethereum:**
 ```bash
 curl -X POST http://localhost:3000/transaction/sendNative \
   -H "Content-Type: application/json" \
@@ -116,7 +118,7 @@ curl -X POST http://localhost:3000/transaction/sendNative \
   }'
 ```
 
-**BSC에서 ERC20 토큰 전송:**
+**Send ERC20 token on BSC:**
 ```bash
 curl -X POST http://localhost:3000/transaction/sendErc20 \
   -H "Content-Type: application/json" \
@@ -129,9 +131,9 @@ curl -X POST http://localhost:3000/transaction/sendErc20 \
   }'
 ```
 
-### 트랜잭션 히스토리
+### Transaction History
 
-**특정 네트워크에서 트랜잭션 내역 조회:**
+**Query transaction history on specific network:**
 ```bash
 curl -X POST http://localhost:3000/transaction/history \
   -H "Content-Type: application/json" \
@@ -143,23 +145,23 @@ curl -X POST http://localhost:3000/transaction/history \
   }'
 ```
 
-## 지원하는 모든 API
+## Supported APIs
 
-다음 API들이 모두 `network` 파라미터를 지원합니다:
+The following APIs all support the `network` parameter:
 
-- **잔액 조회**: `/balance/native`, `/balance/erc20`
-- **트랜잭션**: `/transaction/sendNative`, `/transaction/sendErc20`, `/transaction/estimateGas`
-- **히스토리**: `/transaction/history`, `/transaction/history/all`, `/transaction/details`
-- **이벤트**: `/events/erc20Transfers`
+- **Balance Queries**: `/balance/native`, `/balance/erc20`
+- **Transactions**: `/transaction/sendNative`, `/transaction/sendErc20`, `/transaction/estimateGas`
+- **History**: `/transaction/history`, `/transaction/history/all`, `/transaction/details`
+- **Events**: `/events/erc20Transfers`
 
-## 팁
+## Tips
 
-1. **네트워크 이름은 자유롭게 설정** 가능합니다. `ethereum`, `bsc`, `my-custom-network` 등 원하는 이름을 사용하세요.
+1. **Network names can be set freely**. Use any name you want like `ethereum`, `bsc`, `my-custom-network`, etc.
 
-2. **RPC URL은 정확해야 합니다**. 잘못된 URL을 사용하면 API 호출이 실패합니다.
+2. **RPC URLs must be accurate**. Using incorrect URLs will cause API calls to fail.
 
-3. **기본 네트워크 변경**은 환경변수 `RPC_ENDPOINT`를 설정하면 됩니다.
+3. **To change the default network**, set the `RPC_ENDPOINT` environment variable.
 
-4. **네트워크를 지정하지 않으면** 항상 기본 VERY 네트워크가 사용됩니다.
+4. **If no network is specified**, the default VERY network will always be used.
 
-이제 여러 블록체인 네트워크를 자유롭게 사용할 수 있습니다! 🚀
+Now you can freely use multiple blockchain networks! 🚀

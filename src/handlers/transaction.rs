@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
     response::Json as ResponseJson,
 };
-use tracing::warn;
+use tracing::{warn, info, debug};
 use alloy::primitives::U256;
 use crate::wallet::*;
 use crate::types::*;
@@ -12,22 +12,40 @@ use crate::utils::*;
 pub async fn send_native_coin(
     Json(payload): Json<SendTransactionRequest>,
 ) -> Result<ResponseJson<TransactionResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    info!("Native coin transfer request: to={}, amount={}, network={:?}", 
+          payload.to, payload.amount, payload.network);
+    
     match EvmWallet::create_wallet_from_private_key(&payload.private_key) {
         Ok(wallet) => {
             let wei_amount = (payload.amount * 1_000_000_000_000_000_000.0) as u128;
             let amount = U256::from(wei_amount);
+            debug!("Converted amount: {} ETH -> {} wei", payload.amount, wei_amount);
 
             let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
+            debug!("Using RPC URL: {}", rpc_url);
+            
             match wallet.send_native_coin(&payload.to, amount, &rpc_url).await {
-                Ok(hash) => Ok(ResponseJson(TransactionResponse {
-                    hash: format!("{:#x}", hash),
-                    status: "confirmed".to_string(),
-                })),
+                Ok(hash) => {
+                    info!("Native coin transfer successful: tx_hash={:#x}", hash);
+                    Ok(ResponseJson(TransactionResponse {
+                        hash: format!("{:#x}", hash),
+                        status: "confirmed".to_string(),
+                    }))
+                },
                 Err(e) => {
                     warn!("Failed to send native coin: {}", e);
+                    let error_msg = if e.to_string().contains("insufficient") {
+                        "Insufficient funds for transaction. Please check your balance and gas requirements."
+                    } else if e.to_string().contains("network") || e.to_string().contains("connection") {
+                        "Network connection failed. Please check your network configuration and try again."
+                    } else if e.to_string().contains("gas") {
+                        "Gas estimation failed. The transaction may be too complex or the network is congested."
+                    } else {
+                        &e.to_string()
+                    };
                     Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        ResponseJson(ErrorResponse { error: e.to_string() }),
+                        ResponseJson(ErrorResponse { error: error_msg.to_string() }),
                     ))
                 }
             }
@@ -94,9 +112,16 @@ pub async fn estimate_gas(
                 })),
                 Err(e) => {
                     warn!("Failed to estimate gas: {}", e);
+                    let error_msg = if e.to_string().contains("network") || e.to_string().contains("connection") {
+                        "Network connection failed. Please check your network configuration and try again."
+                    } else if e.to_string().contains("revert") {
+                        "Transaction would fail. Please check the recipient address and contract state."
+                    } else {
+                        &e.to_string()
+                    };
                     Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        ResponseJson(ErrorResponse { error: e.to_string() }),
+                        ResponseJson(ErrorResponse { error: error_msg.to_string() }),
                     ))
                 }
             }

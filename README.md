@@ -1,23 +1,34 @@
-# EVM Wallet API Handlers
+# EVM Wallet API
+
+A comprehensive Rust-based EVM wallet API that supports multiple blockchain networks with decimal amount transfers and fixed gas pricing.
+
+## Features
+
+- **Multi-Network Support**: Add and manage custom EVM networks
+- **Decimal Amounts**: Send tokens with decimal precision (e.g., 0.1, 0.01 ETH)
+- **Fixed Gas Pricing**: Consistent 1.2 Gwei gas price across all transactions
+- **Wallet Management**: Generate mnemonics, create wallets, and manage private keys
+- **Transaction History**: Query native and ERC20 transaction history
+- **Balance Queries**: Check native and ERC20 token balances
 
 ## 1. Health Check
 
-**핸들러**: `health_check`  
-**호출 설명**: 서버 상태 확인  
-**호출 예시**:
+**Handler**: `health_check`  
+**Description**: Check server status  
+**Example**:
 ```bash
 GET /health
 ```
-**응답 예시**:
+**Response**:
 ```
 EVM Wallet API is running!
 ```
 
 ## 2. Address From Private Key
 
-**핸들러**: `address_from_private_key`  
-**호출 설명**: 프라이빗 키로부터 주소 추출 (지갑주소 확인시에 사용하시면 됩니다)
-**호출 예시**:
+**Handler**: `address_from_private_key`  
+**Description**: Extract address from private key (use this to verify wallet address)
+**Example**:
 ```bash
 POST /wallet/getAddress
 Content-Type: application/json
@@ -26,7 +37,7 @@ Content-Type: application/json
   "private_key": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "address": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa"
@@ -35,13 +46,13 @@ Content-Type: application/json
 
 ## 3. Generate Mnemonic
 
-**핸들러**: `generate_mnemonic`  
-**호출 설명**: 24단어 니모닉 생성  (BIP-39기반 표준 니모닉 생성)
-**호출 예시**:
+**Handler**: `generate_mnemonic`  
+**Description**: Generate 24-word mnemonic (BIP-39 standard mnemonic generation)
+**Example**:
 ```bash
 POST /wallet/generateMnemonic
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "mnemonic": "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual"
@@ -50,9 +61,9 @@ POST /wallet/generateMnemonic
 
 ## 4. Generate Mnemonic Custom
 
-**핸들러**: `generate_mnemonic_with_words`  
-**호출 설명**: 커스텀 단어 수로 니모닉 생성 (BIP-39기반 표준 니모닉생성 단어수를 조절가능합니다. 기본은 24자리)
-**호출 예시**:
+**Handler**: `generate_mnemonic_with_words`  
+**Description**: Generate mnemonic with custom word count (BIP-39 standard mnemonic generation with adjustable word count. Default is 24 words)
+**Example**:
 ```bash
 POST /wallet/generateMnemonicCustom
 Content-Type: application/json
@@ -61,7 +72,7 @@ Content-Type: application/json
   "word_count": 12
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "mnemonic": "abandon ability able about above absent absorb abstract absurd abuse access accident"
@@ -70,9 +81,9 @@ Content-Type: application/json
 
 ## 5. Create Wallet From Mnemonic
 
-**핸들러**: `create_wallet_from_mnemonic`  
-**호출 설명**: 니모닉으로부터 지갑 생성  (생성된 니모닉으로부터 지갑을 생성하는로직입니다 니모닉 > 지갑)
-**호출 예시**:
+**Handler**: `create_wallet_from_mnemonic`  
+**Description**: Create wallet from mnemonic (logic to create wallet from generated mnemonic: mnemonic > wallet)
+**Example**:
 ```bash
 POST /wallet/fromMnemonic
 Content-Type: application/json
@@ -81,7 +92,7 @@ Content-Type: application/json
   "mnemonic": "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "address": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa",
@@ -93,20 +104,21 @@ Content-Type: application/json
 
 ## 6. Send Native Coin
 
-**핸들러**: `send_native_coin`  
-**호출 설명**: VERY 코인 전송  
-**호출 예시**:
+**Handler**: `send_native_coin`  
+**Description**: Native coin transfer (supports decimal amounts)  
+**Example**:
 ```bash
 POST /transaction/sendNative
 Content-Type: application/json
 
 {
   "to": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa",
-  "amount": "1",
-  "private_key": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+  "amount": 1.0,
+  "private_key": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  "network": "ethereum"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "hash": "0xabc123def456789abc123def456789abc123def456789abc123def456789abc123",
@@ -116,21 +128,22 @@ Content-Type: application/json
 
 ## 7. Send ERC20 Token
 
-**핸들러**: `send_erc20_token`  
-**호출 설명**: ERC20 토큰 전송  (VERY에서 발행한 토큰을 전송하는 로직)
-**호출 예시**:
+**Handler**: `send_erc20_token`  
+**Description**: ERC20 token transfer (supports decimal amounts)  
+**Example**:
 ```bash
 POST /transaction/sendErc20
 Content-Type: application/json
 
 {
   "to": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa",
-  "amount": "100",
+  "amount": 100.0,
   "token_address": "0xA0b86a33E6441f8C7f9d51e6B8ff0C6a2e4E5F2c",
-  "private_key": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+  "private_key": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  "network": "ethereum"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "hash": "0xdef456789abc123def456789abc123def456789abc123def456789abc123def456",
@@ -140,20 +153,21 @@ Content-Type: application/json
 
 ## 8. Estimate Gas
 
-**핸들러**: `estimate_gas`  
-**호출 설명**: 가스 추정 및 비용 계산 (최종적으로는 total_fee를 확인하시면 되며 이건 "예측비용이기때문에" 실제로는 +/- 가 일부발생할 수 있습니다) 
-**호출 예시**:
+**Handler**: `estimate_gas`  
+**Description**: Gas estimation and cost calculation (fixed at 1.2 Gwei)  
+**Example**:
 ```bash
 POST /transaction/estimateGas
 Content-Type: application/json
 
 {
   "to": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa",
-  "amount": "1",
-  "private_key": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+  "amount": 1.0,
+  "private_key": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  "network": "ethereum"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "gas_limit": 21000,
@@ -164,18 +178,19 @@ Content-Type: application/json
 
 ## 9. Get Transaction Details
 
-**핸들러**: `get_transaction_details`  
-**호출 설명**: 거래 상세 정보 조회  (트랙잭션이 정상실행되었는지 확인하는 방법)
-**호출 예시**:
+**Handler**: `get_transaction_details`  
+**Description**: Get transaction details (check if transaction was successful)
+**Example**:
 ```bash
 POST /transaction/details
 Content-Type: application/json
 
 {
-  "tx_hash": "0xabc123def456789abc123def456789abc123def456789abc123def456789abc123"
+  "tx_hash": "0xabc123def456789abc123def456789abc123def456789abc123def456789abc123",
+  "network": "ethereum"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "transaction": {
@@ -194,18 +209,19 @@ Content-Type: application/json
 
 ## 10. Get Native Balance
 
-**핸들러**: `get_native_balance`  
-**호출 설명**: VERY 코인 잔액 조회
-**호출 예시**:
+**Handler**: `get_native_balance`  
+**Description**: Get native coin balance
+**Example**:
 ```bash
 POST /balance/native
 Content-Type: application/json
 
 {
-  "address": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa"
+  "address": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa",
+  "network": "ethereum"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "balance": "98.991502669199115334"
@@ -214,19 +230,20 @@ Content-Type: application/json
 
 ## 11. Get ERC20 Balance
 
-**핸들러**: `get_erc20_balance`  
-**호출 설명**: ERC20 토큰 잔고 조회
-**호출 예시**:
+**Handler**: `get_erc20_balance`  
+**Description**: Get ERC20 token balance
+**Example**:
 ```bash
 POST /balance/erc20
 Content-Type: application/json
 
 {
   "address": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa",
-  "token_address": "0xA0b86a33E6441f8C7f9d51e6B8ff0C6a2e4E5F2c"
+  "token_address": "0xA0b86a33E6441f8C7f9d51e6B8ff0C6a2e4E5F2c",
+  "network": "ethereum"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "balance": "1000.0"
@@ -235,9 +252,9 @@ Content-Type: application/json
 
 ## 12. Get Native Transaction History
 
-**핸들러**: `get_native_transaction_history`  
-**호출 설명**:  VERY 거래 내역 조회   
-**호출 예시**:
+**Handler**: `get_native_transaction_history`  
+**Description**: Get native transaction history   
+**Example**:
 ```bash
 POST /transaction/history
 Content-Type: application/json
@@ -245,10 +262,11 @@ Content-Type: application/json
 {
   "address": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa",
   "from_block": 12345600,
-  "to_block": 12345700
+  "to_block": 12345700,
+  "network": "ethereum"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "transactions": [
@@ -269,9 +287,9 @@ Content-Type: application/json
 
 ## 13. Get ERC20 Events
 
-**핸들러**: `get_erc20_events`  
-**호출 설명**: ERC20 전송 이벤트 조회  
-**호출 예시**:
+**Handler**: `get_erc20_events`  
+**Description**: Get ERC20 transfer events  
+**Example**:
 ```bash
 POST /events/erc20Transfers
 Content-Type: application/json
@@ -280,10 +298,11 @@ Content-Type: application/json
   "token_address": "0xA0b86a33E6441f8C7f9d51e6B8ff0C6a2e4E5F2c",
   "from_block": 12345600,
   "to_block": 12345700,
-  "address_filter": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa"
+  "address_filter": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa",
+  "network": "ethereum"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "events": [
@@ -301,19 +320,20 @@ Content-Type: application/json
 
 ## 14. Get All Native Transaction History
 
-**핸들러**: `get_all_native_transaction_history`  
-**호출 설명**: 전체 네이티브 거래 내역 조회 (from_block은 필수, to_block은 선택사항 - 값이 없으면 현재 최신 블록으로 설정)
-**호출 예시**:
+**Handler**: `get_all_native_transaction_history`  
+**Description**: Get all native transaction history (from_block required, to_block optional - defaults to latest block)
+**Example**:
 ```bash
 POST /transaction/history/all
 Content-Type: application/json
 
 {
   "from_block": 12345600,
-  "to_block": 12345700
+  "to_block": 12345700,
+  "network": "ethereum"
 }
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "transactions": [
@@ -339,16 +359,72 @@ Content-Type: application/json
 
 ## 15. Get Current Block
 
-**핸들러**: `get_current_block`  
-**호출 설명**: 현재 최신 블록 번호 조회
-**호출 예시**:
+**Handler**: `get_current_block`  
+**Description**: Get current latest block number
+**Example**:
 ```bash
 GET /block/current
 ```
-**응답 예시**:
+**Response**:
 ```json
 {
   "current_block": 12345678
 }
 ```
+
+## 16. Network Management
+
+### Add Network
+```bash
+POST /networks/add
+Content-Type: application/json
+
+{
+  "name": "ethereum",
+  "rpc_url": "https://eth-mainnet.g.alchemy.com/v2/demo"
+}
+```
+
+### List Networks
+```bash
+GET /networks
+```
+
+### Remove Network
+```bash
+POST /networks/remove
+Content-Type: application/json
+
+{
+  "name": "ethereum"
+}
+```
+
+## Environment Configuration
+
+Create a `.env` file in the project root:
+
+```env
+# Default RPC endpoint (used when no network is specified)
+RPC_ENDPOINT=https://rpc.verylabs.io
+
+# Server port (default: 3000)
+PORT=3000
+```
+
+## Key Features
+
+- **Decimal Amount Support**: Use `1.0`, `0.1`, `0.01` instead of wei strings
+- **Fixed Gas Price**: All transactions use 1.2 Gwei gas price
+- **Multi-Network**: Add custom networks via API
+- **Network Parameter**: All APIs support optional `network` parameter
+
+## Quick Start
+
+1. Clone the repository
+2. Create `.env` file with your RPC endpoint
+3. Run `cargo run`
+4. Server starts on `http://localhost:3000`
+
+For detailed network management, see [docs/network.md](docs/network.md).
 ``` 
