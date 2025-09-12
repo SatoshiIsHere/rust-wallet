@@ -62,12 +62,6 @@ pub struct GasEstimateResponse {
     pub total_fee: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct EnvInfoResponse {
-    pub rpc_endpoint: String,
-    pub private_key_set: bool,
-    pub server_port: u16,
-}
 
 #[derive(Debug, Deserialize)]
 pub struct SendTransactionRequest {
@@ -164,27 +158,6 @@ pub struct CurrentBlockResponse {
     pub current_block: u64,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct AddNetworkRequest {
-    pub name: String,
-    pub rpc_url: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct RemoveNetworkRequest {
-    pub name: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct NetworkInfo {
-    pub name: String,
-    pub rpc_url: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct NetworksResponse {
-    pub networks: Vec<NetworkInfo>,
-}
 
 
  

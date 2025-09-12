@@ -12,13 +12,6 @@ pub async fn health_check() -> &'static str {
     "EVM Wallet API is running!"
 }
 
-pub async fn get_env_info() -> ResponseJson<EnvInfoResponse> {
-    ResponseJson(EnvInfoResponse {
-        rpc_endpoint: get_default_rpc_url(),
-        private_key_set: get_default_private_key().is_some(),
-        server_port: get_server_port(),
-    })
-}
 
 pub async fn get_transaction_details(
     Json(payload): Json<TransactionDetailsRequest>,
@@ -117,7 +110,7 @@ pub async fn get_all_native_transaction_history(
 }
 
 pub async fn get_current_block() -> Result<ResponseJson<CurrentBlockResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = get_rpc_url_for_network(None);
     match EvmWallet::get_current_block(&rpc_url).await {
         Ok(current_block) => {
             Ok(ResponseJson(CurrentBlockResponse { current_block }))
@@ -131,48 +124,3 @@ pub async fn get_current_block() -> Result<ResponseJson<CurrentBlockResponse>, (
         }
     }
 }
-
-pub async fn get_networks() -> ResponseJson<NetworksResponse> {
-    let networks = get_all_networks();
-    ResponseJson(NetworksResponse { networks })
-}
-
-pub async fn add_network(
-    Json(payload): Json<AddNetworkRequest>,
-) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<ErrorResponse>)> {
-    match add_custom_network(payload.name.clone(), payload.rpc_url) {
-        Ok(()) => {
-            let response = serde_json::json!({
-                "message": format!("Network '{}' added successfully", payload.name)
-            });
-            Ok(ResponseJson(response))
-        }
-        Err(e) => {
-            warn!("Failed to add network: {}", e);
-            Err((
-                StatusCode::BAD_REQUEST,
-                ResponseJson(ErrorResponse { error: e }),
-            ))
-        }
-    }
-}
-
-pub async fn remove_network(
-    Json(payload): Json<RemoveNetworkRequest>,
-) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<ErrorResponse>)> {
-    match remove_custom_network(&payload.name) {
-        Ok(()) => {
-            let response = serde_json::json!({
-                "message": format!("Network '{}' removed successfully", payload.name)
-            });
-            Ok(ResponseJson(response))
-        }
-        Err(e) => {
-            warn!("Failed to remove network: {}", e);
-            Err((
-                StatusCode::BAD_REQUEST,
-                ResponseJson(ErrorResponse { error: e }),
-            ))
-        }
-    }
-} 

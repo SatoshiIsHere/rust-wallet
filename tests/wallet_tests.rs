@@ -109,7 +109,7 @@ async fn test_wallet_with_anvil_and_env() {
     
     let wallet = EvmWallet::new_random().unwrap();
     
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = env::var("RPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:8545".to_string());
     let balance = EvmWallet::get_native_balance(&wallet.address, &rpc_url).await;
     assert!(balance.is_ok());
     
@@ -136,7 +136,7 @@ async fn test_send_native_coin_with_private_key() {
     let recipient = "0x742d35Cc6634C0532925a3b8D55de0c4a2e6D6b4";
     let amount = U256::from(1000000000000000000u64);
     
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = env::var("RPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:8545".to_string());
     let result = wallet.send_native_coin(recipient, amount, &rpc_url).await;
     
     assert!(result.is_err());
@@ -162,7 +162,7 @@ async fn test_send_erc20_token_with_private_key() {
     let token_address = "0x1234567890123456789012345678901234567890";
     let amount = U256::from(1000000000000000000u64);
     
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = env::var("RPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:8545".to_string());
     let result = wallet.send_erc20_token(recipient, amount, token_address, &rpc_url).await;
     
     assert!(result.is_err());
@@ -181,7 +181,7 @@ async fn test_estimate_gas_with_private_key() {
     let recipient = "0x742d35Cc6634C0532925a3b8D55de0c4a2e6D6b4";
     let amount = U256::from(1000000000000000000u64);
     
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = env::var("RPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:8545".to_string());
     let result = wallet.estimate_gas(recipient, amount, &rpc_url).await;
     assert!(result.is_ok());
     
@@ -222,7 +222,7 @@ async fn test_transaction_functions_with_known_private_key() {
     
     let dummy_recipient = "0x742d35Cc6634C0532925a3b8D55de0c4a2e6D6b4";
     let amount = U256::from(1000000000000000000u64);
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = env::var("RPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:8545".to_string());
     let gas_result = wallet.estimate_gas(dummy_recipient, amount, &rpc_url).await;
     assert!(gas_result.is_ok());
 }
@@ -231,10 +231,10 @@ async fn test_transaction_functions_with_known_private_key() {
 async fn test_environment_variable_usage() {
     setup_test_env();
     
-    let rpc_url = get_default_rpc_url();
+    let rpc_url = env::var("RPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:8545".to_string());
     assert_eq!(rpc_url, "http://localhost:8545");
     
     env::set_var("RPC_ENDPOINT", "https://custom-rpc.example.com");
-    let custom_rpc = get_default_rpc_url();
+    let custom_rpc = env::var("RPC_ENDPOINT").unwrap_or_else(|_| "http://localhost:8545".to_string());
     assert_eq!(custom_rpc, "https://custom-rpc.example.com");
 } 
