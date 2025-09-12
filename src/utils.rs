@@ -15,9 +15,13 @@ pub fn get_default_rpc_url() -> String {
 pub fn get_rpc_url_for_network(network: Option<&str>) -> String {
     match network {
         None => get_default_rpc_url(),
-        Some(network_name) => {
+        Some(network_input) => {
+            if network_input.starts_with("http://") || network_input.starts_with("https://") {
+                return network_input.to_string();
+            }
+            
             if let Ok(custom_networks) = get_custom_networks().lock() {
-                if let Some(rpc_url) = custom_networks.get(network_name) {
+                if let Some(rpc_url) = custom_networks.get(network_input) {
                     return rpc_url.clone();
                 }
             }
