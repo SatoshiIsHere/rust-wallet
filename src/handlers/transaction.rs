@@ -29,7 +29,6 @@ pub async fn send_native_coin(
                     info!("Native coin transfer successful: tx_hash={:#x}", hash);
                     Ok(ResponseJson(TransactionResponse {
                         hash: format!("{:#x}", hash),
-                        status: "confirmed".to_string(),
                     }))
                 },
                 Err(e) => {
@@ -72,7 +71,6 @@ pub async fn send_erc20_token(
             match wallet.send_erc20_token(&payload.to, amount, &payload.token_address, &rpc_url).await {
                 Ok(hash) => Ok(ResponseJson(TransactionResponse {
                     hash: format!("{:#x}", hash),
-                    status: "confirmed".to_string(),
                 })),
                 Err(e) => {
                     warn!("Failed to send ERC20 token: {}", e);
@@ -92,8 +90,6 @@ pub async fn send_erc20_token(
         }
     }
 }
-
-
 
 pub async fn estimate_gas(
     Json(payload): Json<EstimateGasRequest>,
@@ -136,3 +132,48 @@ pub async fn estimate_gas(
     }
 }
 
+pub async fn get_transaction_receipt(
+    Json(payload): Json<TransactionReceiptRequest>,
+) -> Result<ResponseJson<TransactionReceiptResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    info!("Transaction receipt request: tx_hash={}, network={:?}", payload.tx_hash, payload.network);
+    
+    let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
+    debug!("Using RPC URL: {}", rpc_url);
+    
+    match EvmWallet::get_native_transaction_details(&payload.tx_hash, &rpc_url).await {
+        Ok(Some(receipt)) => {
+            info!("Transaction receipt found: tx_hash={}, status={}", payload.tx_hash, receipt.status);
+            Ok(ResponseJson(TransactionReceiptResponse {
+                tx_hash: payload.tx_hash,
+                status: "confirmed".to_string(),
+                block_number: Some(receipt.block_number),
+                gas_used: Some(receipt.gas_used),
+                transaction_fee: Some(receipt.transaction_fee),
+            }))
+        },
+        Ok(None) => {
+            info!("Transaction not found or not confirmed yet: tx_hash={}", payload.tx_hash);
+            Ok(ResponseJson(TransactionReceiptResponse {
+                tx_hash: payload.tx_hash,
+                status: "pending".to_string(),
+                block_number: None,
+                gas_used: None,
+                transaction_fee: None,
+            }))
+        },
+        Err(e) => {
+            warn!("Failed to get transaction receipt: {}", e);
+            let error_msg = if e.to_string().contains("network") || e.to_string().contains("connection") {
+                "Network connection failed. Please check your network configuration and try again."
+            } else if e.to_string().contains("invalid") && e.to_string().contains("hash") {
+                "Invalid transaction hash format. Please provide a valid transaction hash."
+            } else {
+                &e.to_string()
+            };
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                ResponseJson(ErrorResponse { error: error_msg.to_string() }),
+            ))
+        }
+    }
+}

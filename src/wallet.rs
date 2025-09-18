@@ -62,10 +62,22 @@ impl EvmWallet {
     }
 
     pub fn create_wallet_from_private_key(private_key: &str) -> Result<Self> {
-        let signer = PrivateKeySigner::from_str(private_key)?;
+        let trimmed_key = private_key.trim_start_matches("0x");
+        if trimmed_key.len() != 64 {
+            return Err(anyhow::anyhow!("Invalid private key length. Expected 64 characters (32 bytes), got {}", trimmed_key.len()));
+        }
+        
+        if !trimmed_key.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(anyhow::anyhow!("Invalid private key format. Must be hexadecimal"));
+        }
+        
+        let signer = PrivateKeySigner::from_str(private_key)
+            .map_err(|e| anyhow::anyhow!("Failed to create signer from private key: {}", e))?;
         let address = signer.address();
-        let private_key_bytes = hex::decode(private_key.trim_start_matches("0x"))?;
-        let signing_key = SigningKey::from_slice(&private_key_bytes)?;
+        let private_key_bytes = hex::decode(trimmed_key)
+            .map_err(|e| anyhow::anyhow!("Failed to decode private key hex: {}", e))?;
+        let signing_key = SigningKey::from_slice(&private_key_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to create signing key: {}", e))?;
         let public_key = hex::encode(signing_key.verifying_key().to_encoded_point(false).as_bytes());
         
         Ok(EvmWallet {
@@ -137,7 +149,6 @@ impl EvmWallet {
 
         let pending_tx = provider.send_transaction(tx).await?;
         let tx_hash = *pending_tx.tx_hash();
-        let _receipt = pending_tx.get_receipt().await?;
         Ok(tx_hash)
     }
 
@@ -169,7 +180,6 @@ impl EvmWallet {
 
         let pending_tx = provider.send_transaction(tx).await?;
         let tx_hash = *pending_tx.tx_hash();
-        let _receipt = pending_tx.get_receipt().await?;
         Ok(tx_hash)
     }
 

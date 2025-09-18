@@ -44,6 +44,12 @@ pub struct TransactionDetailsRequest {
     pub network: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct TransactionReceiptRequest {
+    pub tx_hash: String,
+    pub network: Option<String>,
+}
+
 
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
@@ -83,7 +89,15 @@ pub struct SendErc20Request {
 #[derive(Debug, Serialize)]
 pub struct TransactionResponse {
     pub hash: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TransactionReceiptResponse {
+    pub tx_hash: String,
     pub status: String,
+    pub block_number: Option<u64>,
+    pub gas_used: Option<u64>,
+    pub transaction_fee: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
