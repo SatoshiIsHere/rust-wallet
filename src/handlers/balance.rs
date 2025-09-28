@@ -44,11 +44,32 @@ pub async fn get_native_balance(
 pub async fn get_erc20_balance(
     Json(payload): Json<Erc20BalanceRequest>,
 ) -> Result<ResponseJson<BalanceResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    info!("ERC20 balance request: address={}, token={}, network={:?}", 
+          payload.address, payload.token_address, payload.network);
+    
     let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
+    debug!("Using RPC URL: {}", rpc_url);
+    
     match EvmWallet::get_erc20_balance(&payload.address, &payload.token_address, &rpc_url).await {
-        Ok(balance) => Ok(ResponseJson(BalanceResponse {
-            balance: wei_to_eth(balance),
-        })),
+        Ok(balance) => {
+            match crate::utils::get_token_decimals(&payload.token_address, &rpc_url).await {
+                Ok(decimals) => {
+                    let readable_balance = crate::utils::token_amount_to_readable(balance, decimals);
+                    debug!("Retrieved ERC20 balance: {} raw -> {} (decimals: {})", balance, readable_balance, decimals);
+                    Ok(ResponseJson(BalanceResponse {
+                        balance: readable_balance,
+                    }))
+                },
+                Err(e) => {
+                    warn!("Failed to get token decimals, using ETH conversion: {}", e);
+                    let eth_balance = wei_to_eth(balance);
+                    debug!("Fallback: Retrieved ERC20 balance: {} raw -> {} ETH", balance, eth_balance);
+                    Ok(ResponseJson(BalanceResponse {
+                        balance: eth_balance,
+                    }))
+                }
+            }
+        },
         Err(e) => {
             warn!("Failed to get ERC20 balance: {}", e);
             let error_msg = if e.to_string().contains("network") || e.to_string().contains("connection") {

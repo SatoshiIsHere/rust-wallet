@@ -14,7 +14,7 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use hex;
-use tracing::{debug};
+use tracing::{debug, warn};
 use crate::types::{Erc20TransferEvent, TransactionReceipt};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,10 +142,22 @@ impl EvmWallet {
 
         let to_address = Address::from_str(to)?;
 
+        let gas_price = if crate::utils::is_very_network(rpc_url) {
+            U256::from(1_200_000_000u64)
+        } else {
+            match crate::utils::get_dynamic_gas_price(rpc_url).await {
+                Ok(price) => price,
+                Err(e) => {
+                    warn!("Failed to get dynamic gas price, using fallback: {}", e);
+                    U256::from(20_000_000_000u64)
+                }
+            }
+        };
+
         let tx = TransactionRequest::default()
             .to(to_address)
             .value(amount_wei)
-            .gas_price(1_200_000_000u128);
+            .gas_price(gas_price.to::<u128>());
 
         let pending_tx = provider.send_transaction(tx).await?;
         let tx_hash = *pending_tx.tx_hash();
@@ -173,10 +185,22 @@ impl EvmWallet {
         let data = format!("{}{}{}", function_selector, to_padded, amount_padded);
         let call_data = Bytes::from(hex::decode(data)?);
 
+        let gas_price: alloy::primitives::Uint<256, 4> = if crate::utils::is_very_network(rpc_url) {
+            U256::from(1_200_000_000u64)
+        } else {
+            match crate::utils::get_dynamic_gas_price(rpc_url).await {
+                Ok(price) => price,
+                Err(e) => {
+                    warn!("Failed to get dynamic gas price, using fallback: {}", e);
+                    U256::from(20_000_000_000u64)
+                }
+            }
+        };
+
         let tx = TransactionRequest::default()
             .to(token_addr)
             .input(call_data.into())
-            .gas_price(1_200_000_000u128);
+            .gas_price(gas_price.to::<u128>());
 
         let pending_tx = provider.send_transaction(tx).await?;
         let tx_hash = *pending_tx.tx_hash();
@@ -232,7 +256,19 @@ impl EvmWallet {
             .value(estimate_amount);
 
         let gas_limit = provider.estimate_gas(tx).await?;
-        let gas_price = U256::from(1_200_000_000u64);
+        
+        let gas_price = if crate::utils::is_very_network(rpc_url) {
+            U256::from(1_200_000_000u64)
+        } else {
+            match crate::utils::get_dynamic_gas_price(rpc_url).await {
+                Ok(price) => price,
+                Err(e) => {
+                    warn!("Failed to get dynamic gas price, using fallback: {}", e);
+                    U256::from(20_000_000_000u64)
+                }
+            }
+        };
+        
         let total_fee = U256::from(gas_limit) * gas_price;
         
         Ok((gas_limit as u64, gas_price.to_string(), total_fee.to_string()))
