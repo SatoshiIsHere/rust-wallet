@@ -132,6 +132,49 @@ pub async fn estimate_gas(
     }
 }
 
+pub async fn estimate_erc20_gas(
+    Json(payload): Json<EstimateErc20GasRequest>,
+) -> Result<ResponseJson<GasEstimateResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    match EvmWallet::create_wallet_from_private_key(&payload.private_key) {
+        Ok(wallet) => {
+            let wei_amount = (payload.amount * 1_000_000_000_000_000_000.0) as u128;
+            let amount = U256::from(wei_amount);
+
+            let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
+            match wallet.estimate_erc20_gas(&payload.to, amount, &payload.token_address, &rpc_url).await {
+                Ok((gas_limit, gas_price, total_fee)) => Ok(ResponseJson(GasEstimateResponse { 
+                    gas_limit, 
+                    gas_price,
+                    total_fee
+                })),
+                Err(e) => {
+                    warn!("Failed to estimate ERC20 gas: {}", e);
+                    let error_msg = if e.to_string().contains("network") || e.to_string().contains("connection") {
+                        "Network connection failed. Please check your network configuration and try again."
+                    } else if e.to_string().contains("revert") {
+                        "Transaction would fail. Please check the recipient address, token contract, and your token balance."
+                    } else if e.to_string().contains("insufficient") {
+                        "Insufficient token balance for this transaction."
+                    } else {
+                        &e.to_string()
+                    };
+                    Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        ResponseJson(ErrorResponse { error: error_msg.to_string() }),
+                    ))
+                }
+            }
+        }
+        Err(e) => {
+            warn!("Invalid private key: {}", e);
+            Err((
+                StatusCode::BAD_REQUEST,
+                ResponseJson(ErrorResponse { error: format!("Invalid private key: {}", e) }),
+            ))
+        }
+    }
+}
+
 pub async fn get_transaction_receipt(
     Json(payload): Json<TransactionReceiptRequest>,
 ) -> Result<ResponseJson<TransactionReceiptResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {

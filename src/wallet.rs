@@ -149,14 +149,20 @@ impl EvmWallet {
                 Ok(price) => price,
                 Err(e) => {
                     warn!("Failed to get dynamic gas price, using fallback: {}", e);
-                    U256::from(20_000_000_000u64)
+                    crate::utils::get_network_fallback_gas_price(rpc_url)
                 }
             }
         };
 
+        let estimate_tx = TransactionRequest::default()
+            .to(to_address)
+            .value(amount_wei);
+        let gas_limit = provider.estimate_gas(estimate_tx).await?;
+
         let tx = TransactionRequest::default()
             .to(to_address)
             .value(amount_wei)
+            .gas_limit(gas_limit)
             .gas_price(gas_price.to::<u128>());
 
         let pending_tx = provider.send_transaction(tx).await?;
@@ -192,14 +198,21 @@ impl EvmWallet {
                 Ok(price) => price,
                 Err(e) => {
                     warn!("Failed to get dynamic gas price, using fallback: {}", e);
-                    U256::from(20_000_000_000u64)
+                    crate::utils::get_network_fallback_gas_price(rpc_url)
                 }
             }
         };
 
+        // 가스 리미트 추정 (예상과 동일한 로직)
+        let estimate_tx = TransactionRequest::default()
+            .to(token_addr)
+            .input(call_data.clone().into());
+        let gas_limit = provider.estimate_gas(estimate_tx).await?;
+
         let tx = TransactionRequest::default()
             .to(token_addr)
             .input(call_data.into())
+            .gas_limit(gas_limit)
             .gas_price(gas_price.to::<u128>());
 
         let pending_tx = provider.send_transaction(tx).await?;
@@ -264,7 +277,51 @@ impl EvmWallet {
                 Ok(price) => price,
                 Err(e) => {
                     warn!("Failed to get dynamic gas price, using fallback: {}", e);
-                    U256::from(20_000_000_000u64)
+                    crate::utils::get_network_fallback_gas_price(rpc_url)
+                }
+            }
+        };
+        
+        let total_fee = U256::from(gas_limit) * gas_price;
+        
+        Ok((gas_limit as u64, gas_price.to_string(), total_fee.to_string()))
+    }
+
+    pub async fn estimate_erc20_gas(
+        &self,
+        to: &str,
+        amount_token_wei: U256,
+        token_address: &str,
+        rpc_url: &str,
+    ) -> Result<(u64, String, String)> {
+        let provider = ProviderBuilder::new()
+            .wallet(EthereumWallet::from(self.signer.clone().unwrap()))
+            .connect_http(rpc_url.parse()?);
+
+        let token_addr = Address::from_str(token_address)?;
+        let to_address = Address::from_str(to)?;
+
+        let function_selector = "a9059cbb";
+        let to_padded = format!("{:0>64}", format!("{:x}", to_address));
+        let amount_padded = format!("{:0>64x}", amount_token_wei);
+        
+        let data = format!("{}{}{}", function_selector, to_padded, amount_padded);
+        let call_data = Bytes::from(hex::decode(data)?);
+
+        let tx = TransactionRequest::default()
+            .to(token_addr)
+            .input(call_data.into());
+
+        let gas_limit = provider.estimate_gas(tx).await?;
+        
+        let gas_price = if crate::utils::is_very_network(rpc_url) {
+            U256::from(1_200_000_000u64)
+        } else {
+            match crate::utils::get_dynamic_gas_price(rpc_url).await {
+                Ok(price) => price,
+                Err(e) => {
+                    warn!("Failed to get dynamic gas price, using fallback: {}", e);
+                    crate::utils::get_network_fallback_gas_price(rpc_url)
                 }
             }
         };

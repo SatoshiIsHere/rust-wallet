@@ -24,6 +24,15 @@ pub struct EstimateGasRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct EstimateErc20GasRequest {
+    pub to: String,
+    pub amount: f64,
+    pub token_address: String,
+    pub private_key: String,
+    pub network: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct NativeTransactionHistoryRequest {
     pub address: String,
     pub from_block: Option<u64>,

@@ -16,6 +16,7 @@ pub fn create_router() -> Router {
         .route("/transaction/sendNative", post(handlers::send_native_coin))
         .route("/transaction/sendErc20", post(handlers::send_erc20_token))
         .route("/transaction/estimateGas", post(handlers::estimate_gas))
+        .route("/transaction/estimateErc20Gas", post(handlers::estimate_erc20_gas))
         .route("/transaction/receipt", post(handlers::get_transaction_receipt))
         .route("/transaction/details", post(handlers::get_transaction_details))
         .route("/transaction/history", post(handlers::get_native_transaction_history))

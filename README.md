@@ -151,10 +151,10 @@ Content-Type: application/json
 }
 ```
 
-## 8. Estimate Gas
+## 8. Estimate Gas (Native Coin)
 
 **Handler**: `estimate_gas`  
-**Description**: Gas estimation and cost calculation (fixed at 1.2 Gwei)  
+**Description**: Gas estimation and cost calculation for native coin transfers (fixed at 1.2 Gwei)  
 **Example**:
 ```bash
 POST /transaction/estimateGas
@@ -176,7 +176,33 @@ Content-Type: application/json
 }
 ```
 
-## 9. Get Transaction Details
+## 9. Estimate Gas (ERC20 Token)
+
+**Handler**: `estimate_erc20_gas`  
+**Description**: Gas estimation and cost calculation for ERC20 token transfers (fixed at 1.2 Gwei)  
+**Example**:
+```bash
+POST /transaction/estimateErc20Gas
+Content-Type: application/json
+
+{
+  "to": "0x742d35Cc6634C0532925a3b8C17F21E71d45aa",
+  "amount": 100.0,
+  "token_address": "0xA0b86a33E6441f8C7f9d51e6B8ff0C6a2e4E5F2c",
+  "private_key": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  "network": "ethereum"
+}
+```
+**Response**:
+```json
+{
+  "gas_limit": 65000,
+  "gas_price": "1200000000",
+  "total_fee": "78000000000000"
+}
+```
+
+## 10. Get Transaction Details
 
 **Handler**: `get_transaction_details`  
 **Description**: Get transaction details (check if transaction was successful)
@@ -207,7 +233,7 @@ Content-Type: application/json
 }
 ```
 
-## 10. Get Native Balance
+## 11. Get Native Balance
 
 **Handler**: `get_native_balance`  
 **Description**: Get native coin balance
@@ -228,7 +254,7 @@ Content-Type: application/json
 }
 ```
 
-## 11. Get ERC20 Balance
+## 12. Get ERC20 Balance
 
 **Handler**: `get_erc20_balance`  
 **Description**: Get ERC20 token balance
