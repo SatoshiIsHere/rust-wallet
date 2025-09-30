@@ -30,6 +30,7 @@ pub struct EstimateErc20GasRequest {
     pub token_address: String,
     pub private_key: String,
     pub network: Option<String>,
+    pub rpc_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

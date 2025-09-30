@@ -137,10 +137,22 @@ pub async fn estimate_erc20_gas(
 ) -> Result<ResponseJson<GasEstimateResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
     match EvmWallet::create_wallet_from_private_key(&payload.private_key) {
         Ok(wallet) => {
-            let wei_amount = (payload.amount * 1_000_000_000_000_000_000.0) as u128;
-            let amount = U256::from(wei_amount);
-
             let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
+            
+            // 토큰의 소수점을 가져와서 올바르게 계산
+            let decimals = match crate::utils::get_token_decimals(&payload.token_address, &rpc_url).await {
+                Ok(decimals) => decimals,
+                Err(e) => {
+                    warn!("Failed to get token decimals, using default 18: {}", e);
+                    18 // 기본값으로 18 사용
+                }
+            };
+            
+            let multiplier = 10_u128.pow(decimals as u32);
+            let token_amount = (payload.amount * multiplier as f64) as u128;
+            let amount = U256::from(token_amount);
+            
+            warn!("Token decimals: {}, Multiplier: {}, Calculated amount: {}", decimals, multiplier, amount);
             match wallet.estimate_erc20_gas(&payload.to, amount, &payload.token_address, &rpc_url).await {
                 Ok((gas_limit, gas_price, total_fee)) => Ok(ResponseJson(GasEstimateResponse { 
                     gas_limit, 

@@ -8,6 +8,7 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_target(false)
         .compact()
+        // .with_max_level(tracing::Level::DEBUG)
         .init();
     let app = create_router();
     let port = env::var("SERVER_PORT")

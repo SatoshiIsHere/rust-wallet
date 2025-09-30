@@ -14,7 +14,7 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use hex;
-use tracing::{debug, warn};
+use tracing::{debug, warn, info};
 use crate::types::{Erc20TransferEvent, TransactionReceipt};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -294,6 +294,12 @@ impl EvmWallet {
         token_address: &str,
         rpc_url: &str,
     ) -> Result<(u64, String, String)> {
+        warn!("=== ERC20 Gas Estimation Started ===");
+        warn!("RPC URL: {}", rpc_url);
+        warn!("Token Address: {}", token_address);
+        warn!("To Address: {}", to);
+        warn!("Amount: {}", amount_token_wei);
+        
         let provider = ProviderBuilder::new()
             .wallet(EthereumWallet::from(self.signer.clone().unwrap()))
             .connect_http(rpc_url.parse()?);
@@ -312,16 +318,35 @@ impl EvmWallet {
             .to(token_addr)
             .input(call_data.into());
 
-        let gas_limit = provider.estimate_gas(tx).await?;
+        warn!("Estimating gas limit...");
+        let gas_limit = match provider.estimate_gas(tx).await {
+            Ok(limit) => {
+                warn!("Gas limit estimated successfully: {}", limit);
+                limit
+            },
+            Err(e) => {
+                warn!("Gas estimation failed: {}", e);
+                warn!("Error details: {:?}", e);
+                return Err(e.into());
+            }
+        };
         
+        warn!("Checking if VERY network...");
         let gas_price = if crate::utils::is_very_network(rpc_url) {
+            warn!("Using VERY Network fixed gas price");
             U256::from(1_200_000_000u64)
         } else {
+            warn!("Not VERY network, getting dynamic gas price...");
             match crate::utils::get_dynamic_gas_price(rpc_url).await {
-                Ok(price) => price,
+                Ok(price) => {
+                    warn!("get_dynamic_gas_price SUCCESS: {}", price);
+                    price
+                },
                 Err(e) => {
                     warn!("Failed to get dynamic gas price, using fallback: {}", e);
-                    crate::utils::get_network_fallback_gas_price(rpc_url)
+                    let fallback_price = crate::utils::get_network_fallback_gas_price(rpc_url);
+                    warn!("Using fallback gas price: {}", fallback_price);
+                    fallback_price
                 }
             }
         };
