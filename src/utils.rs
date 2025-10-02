@@ -81,7 +81,36 @@ pub async fn get_dynamic_gas_price_with_retry(rpc_url: &str, max_retries: u32) -
     Err(last_error.unwrap())
 }
 
-/// 안전한 가스비 가져오기 (재시도 + fallback)
+/// 동적 가스 가격에 마진 추가 (안정성 확보)
+pub async fn get_dynamic_gas_price_with_margin(rpc_url: &str, margin_percent: u32) -> Result<U256, Box<dyn std::error::Error>> {
+    let base_price = get_dynamic_gas_price(rpc_url).await?;
+    let margin = base_price * margin_percent / 100;
+    let adjusted_price = base_price + margin;
+    
+    info!("Dynamic gas price: {} wei, margin: {}%, adjusted: {} wei", 
+          base_price, margin_percent, adjusted_price);
+    Ok(adjusted_price)
+}
+
+pub async fn get_smart_gas_price(rpc_url: &str) -> U256 {
+    if is_very_network(rpc_url) {
+        info!("Using VERY network fixed gas price");
+        return U256::from(1_200_000_000u64);
+    }
+    
+    match get_dynamic_gas_price_with_margin(rpc_url, 10).await {
+        Ok(price) => {
+            info!("Successfully got dynamic gas price with 10% margin: {} wei", price);
+            price
+        }
+        Err(e) => {
+            warn!("Failed to get dynamic gas price with margin: {}, using fallback", e);
+            get_network_fallback_gas_price(rpc_url)
+        }
+    }
+}
+
+/// 안전한 가스비 가져오기 (재시도 + fallback) - 기존 함수 유지 (호환성)
 pub async fn get_safe_gas_price(rpc_url: &str) -> U256 {
     match get_dynamic_gas_price_with_retry(rpc_url, 3).await {
         Ok(price) => {

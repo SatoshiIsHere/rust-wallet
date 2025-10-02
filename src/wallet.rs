@@ -142,17 +142,7 @@ impl EvmWallet {
 
         let to_address = Address::from_str(to)?;
 
-        let gas_price = if crate::utils::is_very_network(rpc_url) {
-            U256::from(1_200_000_000u64)
-        } else {
-            match crate::utils::get_dynamic_gas_price(rpc_url).await {
-                Ok(price) => price,
-                Err(e) => {
-                    warn!("Failed to get dynamic gas price, using fallback: {}", e);
-                    crate::utils::get_network_fallback_gas_price(rpc_url)
-                }
-            }
-        };
+        let gas_price = crate::utils::get_smart_gas_price(rpc_url).await;
 
         let estimate_tx = TransactionRequest::default()
             .to(to_address)
@@ -191,17 +181,7 @@ impl EvmWallet {
         let data = format!("{}{}{}", function_selector, to_padded, amount_padded);
         let call_data = Bytes::from(hex::decode(data)?);
 
-        let gas_price: alloy::primitives::Uint<256, 4> = if crate::utils::is_very_network(rpc_url) {
-            U256::from(1_200_000_000u64)
-        } else {
-            match crate::utils::get_dynamic_gas_price(rpc_url).await {
-                Ok(price) => price,
-                Err(e) => {
-                    warn!("Failed to get dynamic gas price, using fallback: {}", e);
-                    crate::utils::get_network_fallback_gas_price(rpc_url)
-                }
-            }
-        };
+        let gas_price = crate::utils::get_smart_gas_price(rpc_url).await;
 
         // 가스 리미트 추정 (예상과 동일한 로직)
         let estimate_tx = TransactionRequest::default()
@@ -270,17 +250,7 @@ impl EvmWallet {
 
         let gas_limit = provider.estimate_gas(tx).await?;
         
-        let gas_price = if crate::utils::is_very_network(rpc_url) {
-            U256::from(1_200_000_000u64)
-        } else {
-            match crate::utils::get_dynamic_gas_price(rpc_url).await {
-                Ok(price) => price,
-                Err(e) => {
-                    warn!("Failed to get dynamic gas price, using fallback: {}", e);
-                    crate::utils::get_network_fallback_gas_price(rpc_url)
-                }
-            }
-        };
+        let gas_price = crate::utils::get_smart_gas_price(rpc_url).await;
         
         let total_fee = U256::from(gas_limit) * gas_price;
         
@@ -331,25 +301,9 @@ impl EvmWallet {
             }
         };
         
-        warn!("Checking if VERY network...");
-        let gas_price = if crate::utils::is_very_network(rpc_url) {
-            warn!("Using VERY Network fixed gas price");
-            U256::from(1_200_000_000u64)
-        } else {
-            warn!("Not VERY network, getting dynamic gas price...");
-            match crate::utils::get_dynamic_gas_price(rpc_url).await {
-                Ok(price) => {
-                    warn!("get_dynamic_gas_price SUCCESS: {}", price);
-                    price
-                },
-                Err(e) => {
-                    warn!("Failed to get dynamic gas price, using fallback: {}", e);
-                    let fallback_price = crate::utils::get_network_fallback_gas_price(rpc_url);
-                    warn!("Using fallback gas price: {}", fallback_price);
-                    fallback_price
-                }
-            }
-        };
+        warn!("Getting smart gas price...");
+        let gas_price = crate::utils::get_smart_gas_price(rpc_url).await;
+        warn!("Smart gas price result: {} wei", gas_price);
         
         let total_fee = U256::from(gas_limit) * gas_price;
         
