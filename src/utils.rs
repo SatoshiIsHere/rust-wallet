@@ -84,7 +84,7 @@ pub async fn get_dynamic_gas_price_with_retry(rpc_url: &str, max_retries: u32) -
 /// 동적 가스 가격에 마진 추가 (안정성 확보)
 pub async fn get_dynamic_gas_price_with_margin(rpc_url: &str, margin_percent: u32) -> Result<U256, Box<dyn std::error::Error>> {
     let base_price = get_dynamic_gas_price(rpc_url).await?;
-    let margin = base_price * margin_percent / 100;
+    let margin = base_price * U256::from(margin_percent) / U256::from(100);
     let adjusted_price = base_price + margin;
     
     info!("Dynamic gas price: {} wei, margin: {}%, adjusted: {} wei", 

@@ -1714,6 +1714,7 @@ dependencies = [
  "bip39",
  "clap",
  "dotenv",
+ "futures",
  "getrandom 0.2.16",
  "hex",
  "hyper",
