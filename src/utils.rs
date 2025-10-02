@@ -31,21 +31,21 @@ pub fn get_network_fallback_gas_price(rpc_url: &str) -> U256 {
     let rpc_lower = rpc_url.to_lowercase();
     
     if rpc_lower.contains("ethereum") || rpc_lower.contains("mainnet") {
-        U256::from(20_000_000_000u64) 
+        U256::from(30_000_000_000u64) // 20 → 30 Gwei (50% 인상)
     } else if rpc_lower.contains("polygon") || rpc_lower.contains("matic") {
-        U256::from(30_000_000_000u64) 
+        U256::from(35_000_000_000u64) // 30 → 35 Gwei (17% 인상)
     } else if rpc_lower.contains("bsc") || rpc_lower.contains("binance") {
-        U256::from(5_000_000_000u64) 
+        U256::from(8_000_000_000u64)  // 5 → 8 Gwei (60% 인상)
     } else if rpc_lower.contains("arbitrum") {
-        U256::from(100_000_000u64) 
+        U256::from(2_000_000_000u64)  // 0.1 → 2 Gwei (20배 인상)
     } else if rpc_lower.contains("optimism") {
-        U256::from(1_000_000u64) 
+        U256::from(10_000_000u64)     // 0.001 → 0.01 Gwei (10배 인상)
     } else if rpc_lower.contains("avalanche") || rpc_lower.contains("avax") {
-        U256::from(25_000_000_000u64) 
+        U256::from(30_000_000_000u64) // 25 → 30 Gwei (20% 인상)
     } else if rpc_lower.contains("fantom") {
-        U256::from(1_000_000_000u64) 
+        U256::from(2_000_000_000u64)  // 1 → 2 Gwei (100% 인상)
     } else {
-        U256::from(20_000_000_000u64) 
+        U256::from(25_000_000_000u64) // 20 → 25 Gwei (25% 인상)
     }
 }
 

@@ -14,7 +14,7 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use hex;
-use tracing::{debug, warn, info};
+use tracing::{debug, warn};
 use crate::types::{Erc20TransferEvent, TransactionReceipt};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
