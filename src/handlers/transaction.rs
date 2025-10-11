@@ -62,16 +62,38 @@ pub async fn send_native_coin(
 pub async fn send_erc20_token(
     Json(payload): Json<SendErc20Request>,
 ) -> Result<ResponseJson<TransactionResponse>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    info!("ERC20 token transfer request: to={}, amount={}, token={}, network={:?}", 
+          payload.to, payload.amount, payload.token_address, payload.network);
+    
     match EvmWallet::create_wallet_from_private_key(&payload.private_key) {
         Ok(wallet) => {
-            let wei_amount = (payload.amount * 1_000_000_000_000_000_000.0) as u128;
-            let amount = U256::from(wei_amount);
-
             let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
+            
+            let decimals = match crate::utils::get_token_decimals(&payload.token_address, &rpc_url).await {
+                Ok(decimals) => {
+                    info!("Token decimals: {}", decimals);
+                    decimals
+                },
+                Err(e) => {
+                    warn!("Failed to get token decimals, using default 18: {}", e);
+                    18
+                }
+            };
+            
+            let multiplier = 10_u128.pow(decimals as u32);
+            let token_amount = (payload.amount * multiplier as f64) as u128;
+            let amount = U256::from(token_amount);
+            
+            info!("Token decimals: {}, Multiplier: {}, Amount: {} -> {} (raw)", 
+                  decimals, multiplier, payload.amount, amount);
+
             match wallet.send_erc20_token(&payload.to, amount, &payload.token_address, &rpc_url).await {
-                Ok(hash) => Ok(ResponseJson(TransactionResponse {
-                    hash: format!("{:#x}", hash),
-                })),
+                Ok(hash) => {
+                    info!("ERC20 token transfer successful: tx_hash={:#x}", hash);
+                    Ok(ResponseJson(TransactionResponse {
+                        hash: format!("{:#x}", hash),
+                    }))
+                },
                 Err(e) => {
                     warn!("Failed to send ERC20 token: {}", e);
                     Err((

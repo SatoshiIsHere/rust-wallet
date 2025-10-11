@@ -142,7 +142,7 @@ impl EvmWallet {
 
         let to_address = Address::from_str(to)?;
 
-        let gas_price = crate::utils::get_smart_gas_price(rpc_url).await;
+        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
 
         let estimate_tx = TransactionRequest::default()
             .to(to_address)
@@ -153,7 +153,8 @@ impl EvmWallet {
             .to(to_address)
             .value(amount_wei)
             .gas_limit(gas_limit)
-            .gas_price(gas_price.to::<u128>());
+            .max_fee_per_gas(max_fee_per_gas.to::<u128>())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to::<u128>());
 
         let pending_tx = provider.send_transaction(tx).await?;
         let tx_hash = *pending_tx.tx_hash();
@@ -181,7 +182,8 @@ impl EvmWallet {
         let data = format!("{}{}{}", function_selector, to_padded, amount_padded);
         let call_data = Bytes::from(hex::decode(data)?);
 
-        let gas_price = crate::utils::get_smart_gas_price(rpc_url).await;
+        // EIP-1559: max_fee_per_gas와 max_priority_fee_per_gas 사용
+        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
 
         // 가스 리미트 추정 (예상과 동일한 로직)
         let estimate_tx = TransactionRequest::default()
@@ -193,7 +195,8 @@ impl EvmWallet {
             .to(token_addr)
             .input(call_data.into())
             .gas_limit(gas_limit)
-            .gas_price(gas_price.to::<u128>());
+            .max_fee_per_gas(max_fee_per_gas.to::<u128>())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to::<u128>());
 
         let pending_tx = provider.send_transaction(tx).await?;
         let tx_hash = *pending_tx.tx_hash();

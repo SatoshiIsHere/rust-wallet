@@ -93,6 +93,69 @@ pub async fn get_dynamic_gas_price_with_margin(rpc_url: &str, margin_percent: u3
     Ok(adjusted_price)
 }
 
+/// EIP-1559 가스 가격 정보 (max_fee_per_gas, max_priority_fee_per_gas)
+pub async fn get_eip1559_gas_price(rpc_url: &str) -> (U256, U256) {
+    // VERY 네트워크는 기존 로직 유지
+    if is_very_network(rpc_url) {
+        info!("Using VERY network fixed gas price (EIP-1559)");
+        let fixed_price = U256::from(1_200_000_000u64);
+        return (fixed_price, U256::from(1_000_000_000u64)); // max_fee, priority_fee
+    }
+    
+    match get_dynamic_gas_price(rpc_url).await {
+        Ok(base_price) => {
+            // max_fee_per_gas: base_price의 2배 (여유있게 설정)
+            let max_fee = base_price * U256::from(2);
+            
+            // max_priority_fee_per_gas: 네트워크별로 적절한 팁 설정
+            let priority_fee = calculate_priority_fee(rpc_url, base_price);
+            
+            info!("EIP-1559 gas prices - base: {} wei, max_fee: {} wei (2x), priority_fee: {} wei", 
+                  base_price, max_fee, priority_fee);
+            
+            (max_fee, priority_fee)
+        }
+        Err(e) => {
+            warn!("Failed to get dynamic gas price: {}, using fallback", e);
+            let fallback = get_network_fallback_gas_price(rpc_url);
+            let max_fee = fallback * U256::from(2); // 2배로 여유있게
+            let priority_fee = fallback / U256::from(20); // 5% 정도를 팁으로
+            
+            info!("Using fallback EIP-1559 gas prices - max_fee: {} wei, priority_fee: {} wei", 
+                  max_fee, priority_fee);
+            
+            (max_fee, priority_fee)
+        }
+    }
+}
+
+/// 네트워크별 적절한 priority fee 계산
+fn calculate_priority_fee(rpc_url: &str, base_price: U256) -> U256 {
+    let rpc_lower = rpc_url.to_lowercase();
+    
+    // L2 네트워크들은 낮은 priority fee
+    if rpc_lower.contains("arbitrum") || rpc_lower.contains("optimism") {
+        U256::from(100_000_000u64) // 0.1 Gwei
+    } else if rpc_lower.contains("polygon") {
+        U256::from(30_000_000_000u64) // 30 Gwei (Polygon은 높게)
+    } else if rpc_lower.contains("bsc") {
+        U256::from(1_000_000_000u64) // 1 Gwei
+    } else {
+        // 기본값: base_price의 5% 정도 (최소 1 Gwei, 최대 5 Gwei)
+        let calculated = base_price / U256::from(20); // 5%
+        let min_priority = U256::from(1_000_000_000u64); // 1 Gwei
+        let max_priority = U256::from(5_000_000_000u64); // 5 Gwei
+        
+        if calculated < min_priority {
+            min_priority
+        } else if calculated > max_priority {
+            max_priority
+        } else {
+            calculated
+        }
+    }
+}
+
 pub async fn get_smart_gas_price(rpc_url: &str) -> U256 {
     if is_very_network(rpc_url) {
         info!("Using VERY network fixed gas price");
