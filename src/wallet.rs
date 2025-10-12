@@ -253,11 +253,15 @@ impl EvmWallet {
 
         let gas_limit = provider.estimate_gas(tx).await?;
         
-        let gas_price = crate::utils::get_smart_gas_price(rpc_url).await;
+        // EIP-1559: max_fee와 priority_fee 사용
+        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
         
-        let total_fee = U256::from(gas_limit) * gas_price;
+        // 실제 예상 지불액: 현재 base_fee 기준으로 계산
+        // (max_fee가 아닌 실제 base_fee + priority_fee로 예측)
+        let estimated_gas_price = max_fee_per_gas / U256::from(2) + max_priority_fee_per_gas; // base_fee 추정 + priority
+        let total_fee = U256::from(gas_limit) * estimated_gas_price;
         
-        Ok((gas_limit as u64, gas_price.to_string(), total_fee.to_string()))
+        Ok((gas_limit as u64, estimated_gas_price.to_string(), total_fee.to_string()))
     }
 
     pub async fn estimate_erc20_gas(
@@ -304,13 +308,17 @@ impl EvmWallet {
             }
         };
         
-        warn!("Getting smart gas price...");
-        let gas_price = crate::utils::get_smart_gas_price(rpc_url).await;
-        warn!("Smart gas price result: {} wei", gas_price);
+        warn!("Getting EIP-1559 gas prices...");
+        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
         
-        let total_fee = U256::from(gas_limit) * gas_price;
+        // 실제 예상 지불액: 현재 base_fee 기준으로 계산
+        let estimated_gas_price = max_fee_per_gas / U256::from(2) + max_priority_fee_per_gas;
+        warn!("Estimated gas price: {} wei (max_fee: {}, priority: {})", 
+              estimated_gas_price, max_fee_per_gas, max_priority_fee_per_gas);
         
-        Ok((gas_limit as u64, gas_price.to_string(), total_fee.to_string()))
+        let total_fee = U256::from(gas_limit) * estimated_gas_price;
+        
+        Ok((gas_limit as u64, estimated_gas_price.to_string(), total_fee.to_string()))
     }
 
     pub async fn get_erc20_transfer_events(
