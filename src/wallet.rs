@@ -253,7 +253,7 @@ impl EvmWallet {
         let gas_limit = provider.estimate_gas(tx).await?;
         
         
-        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        let (_max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
         
         let current_gas_price = match crate::utils::get_dynamic_gas_price(rpc_url).await {
             Ok(price) => price,
