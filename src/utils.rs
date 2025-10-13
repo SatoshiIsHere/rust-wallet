@@ -112,64 +112,62 @@ pub async fn get_eip1559_gas_price(rpc_url: &str) -> (U256, U256) {
         return (fixed_price, U256::from(1_000_000_000u64));
     }
     
-    match get_dynamic_gas_price(rpc_url).await {
-        Ok(base_price) => {
-            let max_fee = base_price * U256::from(2);
-            let priority_fee = calculate_priority_fee(rpc_url, base_price);
-            
-            info!("EIP-1559 gas prices - base: {} wei, max_fee: {} wei (2x), priority_fee: {} wei", 
-                  base_price, max_fee, priority_fee);
-            
-            (max_fee, priority_fee)
+    let provider = match ProviderBuilder::new().connect_http(rpc_url.parse().ok().unwrap_or_else(|| "http://localhost:8545".parse().unwrap())) {
+        provider => provider
+    };
+    
+    let base_price = match provider.get_gas_price().await {
+        Ok(price) => U256::from(price),
+        Err(_) => get_network_fallback_gas_price(rpc_url)
+    };
+    
+    let max_fee = base_price * U256::from(2);
+    
+    let priority_fee = match provider.raw_request::<(), String>("eth_maxPriorityFeePerGas".into(), ()).await {
+        Ok(hex_value) => {
+            match U256::from_str(&hex_value) {
+                Ok(value) => {
+                    info!("Got priority fee from network API (eth_maxPriorityFeePerGas): {} wei", value);
+                    value
+                }
+                Err(_) => {
+                    warn!("Failed to parse priority fee, calculating from base_price");
+                    calculate_priority_fee(rpc_url, base_price)
+                }
+            }
         }
-        Err(e) => {
-            warn!("Failed to get dynamic gas price: {}, using fallback", e);
-            let fallback = get_network_fallback_gas_price(rpc_url);
-            let max_fee = fallback * U256::from(2);
-            let priority_fee = fallback / U256::from(20);
-            
-            info!("Using fallback EIP-1559 gas prices - max_fee: {} wei, priority_fee: {} wei", 
-                  max_fee, priority_fee);
-            
-            (max_fee, priority_fee)
+        Err(_) => {
+            warn!("Network doesn't support eth_maxPriorityFeePerGas, calculating from base_price");
+            calculate_priority_fee(rpc_url, base_price)
         }
-    }
+    };
+    
+    info!("EIP-1559 gas prices - base: {} wei, max_fee: {} wei (2x), priority_fee: {} wei", 
+          base_price, max_fee, priority_fee);
+    
+    (max_fee, priority_fee)
 }
 
 fn calculate_priority_fee(rpc_url: &str, base_price: U256) -> U256 {
+    // base_price의 10%를 priority fee로 사용 (완전히 네트워크 기반!)
+    let calculated = base_price / U256::from(10); // 10%
+    
     let rpc_lower = rpc_url.to_lowercase();
-    if rpc_lower.contains("arbitrum") || rpc_lower.contains("optimism") {
-        let calculated = base_price / U256::from(10);
-        let min_priority = U256::from(100_000_000u64);
-        if calculated < min_priority {
-            min_priority
-        } else {
-            calculated
-        }
+    
+    // 매우 낮은 최소값만 설정 (하드코딩 최소화)
+    let min_priority = if rpc_lower.contains("arbitrum") || rpc_lower.contains("optimism") {
+        U256::from(1_000_000u64) // 0.001 Gwei (L2는 매우 낮게)
     } else if rpc_lower.contains("polygon") {
-        let calculated = base_price / U256::from(10);
-        let min_priority = U256::from(1_000_000_000u64);
-        let max_priority = U256::from(3_000_000_000u64);
-        
-        if calculated < min_priority {
-            min_priority
-        } else if calculated > max_priority {
-            max_priority
-        } else {
-            calculated
-        }
+        U256::from(10_000_000u64) // 0.01 Gwei
     } else {
-        let calculated = base_price / U256::from(10);
-        let min_priority = U256::from(500_000_000u64);
-        let max_priority = U256::from(3_000_000_000u64);
-        
-        if calculated < min_priority {
-            min_priority
-        } else if calculated > max_priority {
-            max_priority
-        } else {
-            calculated
-        }
+        U256::from(10_000_000u64) // 0.01 Gwei (기본값)
+    };
+    
+    // 계산된 값 우선, 최소값은 안전장치로만
+    if calculated < min_priority {
+        min_priority
+    } else {
+        calculated // 네트워크 기반 값 사용!
     }
 }
 
