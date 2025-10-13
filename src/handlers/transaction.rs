@@ -161,12 +161,11 @@ pub async fn estimate_erc20_gas(
         Ok(wallet) => {
             let rpc_url = get_rpc_url_for_network(payload.network.as_deref());
             
-            // 토큰의 소수점을 가져와서 올바르게 계산
             let decimals = match crate::utils::get_token_decimals(&payload.token_address, &rpc_url).await {
                 Ok(decimals) => decimals,
                 Err(e) => {
                     warn!("Failed to get token decimals, using default 18: {}", e);
-                    18 // 기본값으로 18 사용
+                    18
                 }
             };
             

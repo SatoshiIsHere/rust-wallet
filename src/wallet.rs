@@ -36,6 +36,7 @@ pub struct WalletResponse {
 }
 
 impl EvmWallet {
+
     pub fn new_random() -> Result<Self> {
         let signing_key = SigningKey::random(&mut thread_rng());
         let private_key_bytes = signing_key.to_bytes();
@@ -141,12 +142,15 @@ impl EvmWallet {
             .connect_http(rpc_url.parse()?);
 
         let to_address = Address::from_str(to)?;
-
+        // EIP-1559 가스 가격
         let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
 
+        // estimate_gas (EIP-1559 파라미터 포함)
         let estimate_tx = TransactionRequest::default()
             .to(to_address)
-            .value(amount_wei);
+            .value(amount_wei)
+            .max_fee_per_gas(max_fee_per_gas.to::<u128>())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to::<u128>());
         let gas_limit = provider.estimate_gas(estimate_tx).await?;
 
         let tx = TransactionRequest::default()
@@ -182,13 +186,15 @@ impl EvmWallet {
         let data = format!("{}{}{}", function_selector, to_padded, amount_padded);
         let call_data = Bytes::from(hex::decode(data)?);
 
-        // EIP-1559: max_fee_per_gas와 max_priority_fee_per_gas 사용
+        // EIP-1559 가스 가격
         let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
 
-        // 가스 리미트 추정 (예상과 동일한 로직)
+        // estimate_gas (EIP-1559 파라미터 포함)
         let estimate_tx = TransactionRequest::default()
             .to(token_addr)
-            .input(call_data.clone().into());
+            .input(call_data.clone().into())
+            .max_fee_per_gas(max_fee_per_gas.to::<u128>())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to::<u128>());
         let gas_limit = provider.estimate_gas(estimate_tx).await?;
 
         let tx = TransactionRequest::default()
@@ -247,20 +253,29 @@ impl EvmWallet {
         
         let estimate_amount = U256::from(10u64.pow(16));
 
+        // EIP-1559 가스 가격
+        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+
+        // estimate_gas (EIP-1559 파라미터 포함)
         let tx = TransactionRequest::default()
             .to(to_address)
-            .value(estimate_amount);
-
+            .value(estimate_amount)
+            .max_fee_per_gas(max_fee_per_gas.to::<u128>())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to::<u128>());
         let gas_limit = provider.estimate_gas(tx).await?;
         
-        // EIP-1559: max_fee와 priority_fee 사용
-        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        // 네트워크에서 현재 가스 가격 가져오기
+        let current_gas_price = match crate::utils::get_dynamic_gas_price(rpc_url).await {
+            Ok(price) => price,
+            Err(e) => {
+                warn!("Failed to get dynamic gas price: {}, using fallback", e);
+                crate::utils::get_network_fallback_gas_price(rpc_url)
+            }
+        };
         
-        // 실제 예상 지불액: 현재 base_fee 기준으로 계산
-        // (max_fee가 아닌 실제 base_fee + priority_fee로 예측)
-        let estimated_gas_price = max_fee_per_gas / U256::from(2) + max_priority_fee_per_gas; // base_fee 추정 + priority
+        // 실제 예상 지불액 = 현재 가스 가격 + priority_fee
+        let estimated_gas_price = current_gas_price + max_priority_fee_per_gas;        
         let total_fee = U256::from(gas_limit) * estimated_gas_price;
-        
         Ok((gas_limit as u64, estimated_gas_price.to_string(), total_fee.to_string()))
     }
 
@@ -291,15 +306,22 @@ impl EvmWallet {
         let data = format!("{}{}{}", function_selector, to_padded, amount_padded);
         let call_data = Bytes::from(hex::decode(data)?);
 
+        warn!("Getting EIP-1559 gas prices...");
+        // EIP-1559 가스 가격
+        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+
+        // estimate_gas (EIP-1559 파라미터 포함)
         let tx = TransactionRequest::default()
             .to(token_addr)
-            .input(call_data.into());
+            .input(call_data.into())
+            .max_fee_per_gas(max_fee_per_gas.to::<u128>())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to::<u128>());
 
-        warn!("Estimating gas limit...");
+        warn!("Estimating gas limit with EIP-1559 parameters...");
         let gas_limit = match provider.estimate_gas(tx).await {
             Ok(limit) => {
                 warn!("Gas limit estimated successfully: {}", limit);
-                limit
+                limit as u64
             },
             Err(e) => {
                 warn!("Gas estimation failed: {}", e);
@@ -308,16 +330,23 @@ impl EvmWallet {
             }
         };
         
-        warn!("Getting EIP-1559 gas prices...");
-        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        // 네트워크에서 현재 가스 가격 가져오기
+        let current_gas_price = match crate::utils::get_dynamic_gas_price(rpc_url).await {
+            Ok(price) => {
+                warn!("Current gas price from network: {} wei", price);
+                price
+            },
+            Err(e) => {
+                warn!("Failed to get dynamic gas price: {}, using fallback", e);
+                crate::utils::get_network_fallback_gas_price(rpc_url)
+            }
+        };
         
-        // 실제 예상 지불액: 현재 base_fee 기준으로 계산
-        let estimated_gas_price = max_fee_per_gas / U256::from(2) + max_priority_fee_per_gas;
-        warn!("Estimated gas price: {} wei (max_fee: {}, priority: {})", 
-              estimated_gas_price, max_fee_per_gas, max_priority_fee_per_gas);
-        
+        // 실제 예상 지불액 = 현재 가스 가격 + priority_fee
+        let estimated_gas_price = current_gas_price + max_priority_fee_per_gas;
+        warn!("Estimated gas price: {} wei (gas_price: {} + priority: {})", 
+              estimated_gas_price, current_gas_price, max_priority_fee_per_gas);        
         let total_fee = U256::from(gas_limit) * estimated_gas_price;
-        
         Ok((gas_limit as u64, estimated_gas_price.to_string(), total_fee.to_string()))
     }
 
