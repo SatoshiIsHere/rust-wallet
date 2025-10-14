@@ -251,7 +251,7 @@ impl EvmWallet {
             .value(estimate_amount);
         let gas_limit = provider.estimate_gas(tx).await?;
         
-        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        let (max_fee_per_gas, _) = crate::utils::get_eip1559_gas_price(rpc_url).await;
         
         let from_address = self.signer.as_ref().unwrap().address();
         let balance = provider.get_balance(from_address).await?;
@@ -265,15 +265,7 @@ impl EvmWallet {
             ));
         }
         
-        let current_gas_price = match crate::utils::get_dynamic_gas_price(rpc_url).await {
-            Ok(price) => price,
-            Err(e) => {
-                warn!("Failed to get dynamic gas price: {}, using fallback", e);
-                crate::utils::get_network_fallback_gas_price(rpc_url)
-            }
-        };
-        
-        let estimated_gas_price = current_gas_price + max_priority_fee_per_gas;        
+        let estimated_gas_price = max_fee_per_gas;        
         let total_fee = U256::from(gas_limit) * estimated_gas_price;
         Ok((gas_limit as u64, estimated_gas_price.to_string(), total_fee.to_string()))
     }
@@ -322,7 +314,7 @@ impl EvmWallet {
             }
         };
         
-        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        let (max_fee_per_gas, _) = crate::utils::get_eip1559_gas_price(rpc_url).await;
         
         let from_address = self.signer.as_ref().unwrap().address();
         let balance = provider.get_balance(from_address).await?;
@@ -335,20 +327,8 @@ impl EvmWallet {
             ));
         }
         
-        let current_gas_price = match crate::utils::get_dynamic_gas_price(rpc_url).await {
-            Ok(price) => {
-                warn!("Current gas price from network: {} wei", price);
-                price
-            },
-            Err(e) => {
-                warn!("Failed to get dynamic gas price: {}, using fallback", e);
-                crate::utils::get_network_fallback_gas_price(rpc_url)
-            }
-        };
-        
-        let estimated_gas_price = current_gas_price + max_priority_fee_per_gas;
-        warn!("Estimated gas price: {} wei (gas_price: {} + priority: {})", 
-              estimated_gas_price, current_gas_price, max_priority_fee_per_gas);        
+        let estimated_gas_price = max_fee_per_gas;
+        warn!("Estimated gas price: {} wei (using max_fee_per_gas)", estimated_gas_price);        
         let total_fee = U256::from(gas_limit) * estimated_gas_price;
         Ok((gas_limit as u64, estimated_gas_price.to_string(), total_fee.to_string()))
     }
