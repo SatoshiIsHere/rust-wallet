@@ -243,7 +243,6 @@ impl EvmWallet {
             .wallet(EthereumWallet::from(self.signer.clone().unwrap()))
             .connect_http(rpc_url.parse()?);
         let to_address = Address::from_str(to)?;
-        
         let estimate_amount = U256::from(10u64.pow(16));
 
         
@@ -252,8 +251,19 @@ impl EvmWallet {
             .value(estimate_amount);
         let gas_limit = provider.estimate_gas(tx).await?;
         
+        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
         
-        let (_max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        let from_address = self.signer.as_ref().unwrap().address();
+        let balance = provider.get_balance(from_address).await?;
+        let max_gas_cost = U256::from(gas_limit) * max_fee_per_gas;
+        let total_needed = estimate_amount + max_gas_cost;
+        
+        if balance < total_needed {
+            return Err(anyhow::anyhow!(
+                "Insufficient funds: balance {} wei, needed {} wei (amount: {}, max gas cost: {})",
+                balance, total_needed, estimate_amount, max_gas_cost
+            ));
+        }
         
         let current_gas_price = match crate::utils::get_dynamic_gas_price(rpc_url).await {
             Ok(price) => price,
@@ -312,7 +322,18 @@ impl EvmWallet {
             }
         };
         
-        let (_max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        
+        let from_address = self.signer.as_ref().unwrap().address();
+        let balance = provider.get_balance(from_address).await?;
+        let max_gas_cost = U256::from(gas_limit) * max_fee_per_gas;
+        
+        if balance < max_gas_cost {
+            return Err(anyhow::anyhow!(
+                "Insufficient ETH for gas: balance {} wei, max gas cost {} wei (gas_limit: {}, max_fee: {})",
+                balance, max_gas_cost, gas_limit, max_fee_per_gas
+            ));
+        }
         
         let current_gas_price = match crate::utils::get_dynamic_gas_price(rpc_url).await {
             Ok(price) => {
