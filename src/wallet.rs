@@ -148,7 +148,7 @@ impl EvmWallet {
             .value(amount_wei);
         let gas_limit = provider.estimate_gas(estimate_tx).await?;
         
-        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        let (max_fee_per_gas, max_priority_fee_per_gas, _) = crate::utils::get_eip1559_gas_price(rpc_url).await;
 
         let tx = TransactionRequest::default()
             .to(to_address)
@@ -188,7 +188,7 @@ impl EvmWallet {
             .input(call_data.clone().into());
         let gas_limit = provider.estimate_gas(estimate_tx).await?;
         
-        let (max_fee_per_gas, max_priority_fee_per_gas) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        let (max_fee_per_gas, max_priority_fee_per_gas, _) = crate::utils::get_eip1559_gas_price(rpc_url).await;
 
         let tx = TransactionRequest::default()
             .to(token_addr)
@@ -251,7 +251,7 @@ impl EvmWallet {
             .value(estimate_amount);
         let gas_limit = provider.estimate_gas(tx).await?;
         
-        let (max_fee_per_gas, _) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        let (max_fee_per_gas, priority_fee, base_fee) = crate::utils::get_eip1559_gas_price(rpc_url).await;
         
         let from_address = self.signer.as_ref().unwrap().address();
         let balance = provider.get_balance(from_address).await?;
@@ -265,7 +265,7 @@ impl EvmWallet {
             ));
         }
         
-        let estimated_gas_price = max_fee_per_gas;        
+        let estimated_gas_price = base_fee + priority_fee;        
         let total_fee = U256::from(gas_limit) * estimated_gas_price;
         Ok((gas_limit as u64, estimated_gas_price.to_string(), total_fee.to_string()))
     }
@@ -314,7 +314,7 @@ impl EvmWallet {
             }
         };
         
-        let (max_fee_per_gas, _) = crate::utils::get_eip1559_gas_price(rpc_url).await;
+        let (max_fee_per_gas, priority_fee, base_fee) = crate::utils::get_eip1559_gas_price(rpc_url).await;
         
         let from_address = self.signer.as_ref().unwrap().address();
         let balance = provider.get_balance(from_address).await?;
@@ -327,8 +327,8 @@ impl EvmWallet {
             ));
         }
         
-        let estimated_gas_price = max_fee_per_gas;
-        warn!("Estimated gas price: {} wei (using max_fee_per_gas)", estimated_gas_price);        
+        let estimated_gas_price = base_fee + priority_fee;
+        warn!("Estimated gas price: {} wei (base: {} + priority: {})", estimated_gas_price, base_fee, priority_fee);        
         let total_fee = U256::from(gas_limit) * estimated_gas_price;
         Ok((gas_limit as u64, estimated_gas_price.to_string(), total_fee.to_string()))
     }

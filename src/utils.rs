@@ -105,11 +105,13 @@ pub async fn get_dynamic_gas_price_with_margin(rpc_url: &str, margin_percent: u3
     Ok(adjusted_price)
 }
 
-pub async fn get_eip1559_gas_price(rpc_url: &str) -> (U256, U256) {
+pub async fn get_eip1559_gas_price(rpc_url: &str) -> (U256, U256, U256) {
     if is_very_network(rpc_url) {
         info!("Using VERY network fixed gas price (EIP-1559)");
-        let fixed_price = U256::from(1_200_000_000u64);
-        return (fixed_price, U256::from(1_000_000_000u64));
+        let base_price = U256::from(1_200_000_000u64);
+        let priority_fee = U256::from(1_000_000_000u64);
+        let max_fee = base_price * U256::from(2);
+        return (max_fee, priority_fee, base_price);
     }
     
     let provider = match ProviderBuilder::new().connect_http(rpc_url.parse().ok().unwrap_or_else(|| "http://localhost:8545".parse().unwrap())) {
@@ -145,7 +147,7 @@ pub async fn get_eip1559_gas_price(rpc_url: &str) -> (U256, U256) {
     info!("EIP-1559 gas prices - base: {} wei, max_fee: {} wei (2x), priority_fee: {} wei", 
           base_price, max_fee, priority_fee);
     
-    (max_fee, priority_fee)
+    (max_fee, priority_fee, base_price)
 }
 
 fn calculate_priority_fee(rpc_url: &str, base_price: U256) -> U256 {
