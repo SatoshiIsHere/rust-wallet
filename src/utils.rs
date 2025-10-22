@@ -18,6 +18,12 @@ pub fn is_very_network(rpc_url: &str) -> bool {
     rpc_url.contains("verylabs.io") || rpc_url.contains("very")
 }
 
+pub fn is_non_eip1559_network(rpc_url: &str) -> bool {
+    let rpc_lower = rpc_url.to_lowercase();
+    rpc_lower.contains("bsc") || 
+    rpc_lower.contains("binance")
+}
+
 pub async fn get_dynamic_gas_price(rpc_url: &str) -> Result<U256, Box<dyn std::error::Error>> {
     let provider = ProviderBuilder::new()
         .connect_http(rpc_url.parse()?);

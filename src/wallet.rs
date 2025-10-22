@@ -265,7 +265,11 @@ impl EvmWallet {
             ));
         }
         
-        let estimated_gas_price = base_fee + priority_fee;        
+        let estimated_gas_price = if crate::utils::is_non_eip1559_network(rpc_url) {
+            base_fee
+        } else {
+            base_fee + priority_fee
+        };
         let total_fee = U256::from(gas_limit) * estimated_gas_price;
         Ok((gas_limit as u64, estimated_gas_price.to_string(), total_fee.to_string()))
     }
@@ -327,8 +331,14 @@ impl EvmWallet {
             ));
         }
         
-        let estimated_gas_price = base_fee + priority_fee;
-        warn!("Estimated gas price: {} wei (base: {} + priority: {})", estimated_gas_price, base_fee, priority_fee);        
+        let estimated_gas_price = if crate::utils::is_non_eip1559_network(rpc_url) {
+            warn!("Non-EIP-1559 network detected, using base_fee only");
+            base_fee
+        } else {
+            warn!("EIP-1559 network, using base_fee + priority_fee");
+            base_fee + priority_fee
+        };
+        warn!("Estimated gas price: {} wei (base: {}, priority: {})", estimated_gas_price, base_fee, priority_fee);        
         let total_fee = U256::from(gas_limit) * estimated_gas_price;
         Ok((gas_limit as u64, estimated_gas_price.to_string(), total_fee.to_string()))
     }
